@@ -1,0 +1,24 @@
+# One-click deploy on Render: New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: dream-team
+    runtime: node
+    plan: starter            # always-on; the free plan sleeps, which drops live duels
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false          # paste your Google OAuth client ID in the Render dashboard
+      - key: DB_PATH
+        value: /var/data/dream-team.db
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1

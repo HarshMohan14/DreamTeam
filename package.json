@@ -1,0 +1,28 @@
+{
+  "name": "dream-team-cricket",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dream Team: Cricket Draft Game. Web app with live 1v1 duel server and Google sign-in.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
+    "dev:server": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env --watch server/index.js",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
+    "check": "node -e \"new Function(require('fs').readFileSync('src/game/game.js','utf8'))\" && node --check server/index.js && echo ok"
+  },
+  "dependencies": {
+    "compression": "^1.8.2",
+    "express": "^4.22.3",
+    "google-auth-library": "^9.15.1",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4"
+  },
+  "devDependencies": {
+    "vite": "^5.4.21"
+  }
+}

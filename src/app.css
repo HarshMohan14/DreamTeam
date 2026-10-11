@@ -1,0 +1,49 @@
+/* Web app shell: boot splash, account card, sign-in sheet */
+html{background:#0B0826}
+#boot{position:fixed;inset:0;z-index:999;display:grid;place-content:center;justify-items:center;gap:14px;background:radial-gradient(120% 80% at 50% 20%,#2E1896,#0F0A38 60%,#0B0826);transition:opacity .35s ease,visibility .35s}
+#boot b{font-family:'Barlow Condensed','Arial Narrow',Impact,sans-serif;font-style:italic;font-weight:800;font-size:34px;letter-spacing:.02em;color:#fff}
+#boot b span{color:#FFC93D}
+.boot-ball{width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#FF8A95,#E01E37 45%,#7A0A1A);box-shadow:0 0 30px rgba(255,59,78,.55),inset -4px -6px 10px rgba(0,0,0,.35);animation:bootspin 1s linear infinite;position:relative}
+.boot-ball::after{content:"";position:absolute;inset:6px 20px;border-left:2px dashed rgba(255,255,255,.75);border-right:2px dashed rgba(255,255,255,.75);border-radius:50%}
+@keyframes bootspin{to{transform:rotate(360deg)}}
+html.ready #boot{opacity:0;visibility:hidden}
+@media (prefers-reduced-motion:reduce){.boot-ball{animation:none}}
+
+/* account card on home */
+.acct7{position:relative;z-index:2;margin-top:12px;padding:1.5px;background:linear-gradient(150deg,rgba(125,243,255,.85),rgba(99,102,241,.45) 50%,rgba(224,64,251,.45));clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+.acct7 .ac-in{padding:12px;background:linear-gradient(160deg,#22157A 0%,#140C4A 60%,#0F0A38 100%);clip-path:polygon(13px 0,100% 0,100% calc(100% - 13px),calc(100% - 13px) 100%,0 100%,0 13px);color:#fff}
+.ac-top{display:flex;align-items:center;gap:10px}
+.ac-t{flex:1;min-width:0;line-height:1.15}
+.ac-t b{display:block;font-family:var(--display);font-style:italic;font-weight:800;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-t small{display:block;font-size:12.5px;color:#C9C3F2;margin-top:2px}
+.ac-ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#032536;background:linear-gradient(180deg,#A6F6FF,#12A5C8);box-shadow:0 0 14px rgba(125,243,255,.45)}
+.ac-ic svg{width:24px;height:24px}
+.ac-ic.big{width:56px;height:56px;border-radius:16px;margin:0 auto 10px}
+.ac-ic.big svg{width:32px;height:32px}
+.ac-g{margin-top:12px;min-height:44px;display:flex;justify-content:center}
+.ac-av{flex:none;width:40px;height:40px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px #7DF3FF}
+.ac-av.ini,.hp-av.ini{display:grid;place-items:center;background:linear-gradient(180deg,#A6F6FF,#12A5C8);color:#032536;font-family:var(--display);font-weight:800;font-size:20px}
+.acct7.in .ac-t b{font-size:18px}
+.ac-out{flex:none;border:0;background:rgba(255,255,255,.1);color:#E4E0FF;border-radius:999px;padding:8px 12px;font:600 13px var(--body);cursor:pointer}
+.ac-out:active{transform:scale(.96)}
+.ac-err{margin:0;font-size:13px;color:#FFD7A0;text-align:center}
+.ac-dev{border:0;border-radius:999px;padding:12px 18px;font:700 15px var(--body);background:#fff;color:#1f1f1f;cursor:pointer}
+
+/* avatar badge on the HUD flag */
+.hp-fl.has-av{position:relative;overflow:visible}
+.hp-fl.has-av>svg,.hp-fl.has-av>img:not(.hp-av){border-radius:10px;overflow:hidden}
+.hp-av{position:absolute;right:-6px;bottom:-6px;width:20px;height:20px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px #0F0A38;z-index:2}
+.hp-av.ini{font-size:12px}
+
+/* nudges */
+.acc-nudge{display:flex;align-items:center;gap:10px}
+.acc-nudge span{flex:1}
+.acc-btn{flex:none;border:0;border-radius:999px;padding:7px 12px;cursor:pointer;font-family:var(--display);font-style:italic;font-weight:800;font-size:14px;color:#032536;background:linear-gradient(180deg,#A6F6FF,#12A5C8)}
+.dl-chan+.acc-nudge{margin:10px 0 0}
+
+/* sign-in sheet */
+.signin7{text-align:center}
+.signin7 h3{margin:0 0 6px}
+.signin7 p{margin:0 0 4px;color:#C9C3F2}
+.signin7 .ac-g{margin:16px 0 12px}
+.signin7 .btn{width:100%}
