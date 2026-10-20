@@ -15,6 +15,9 @@ s.src = gameUrl;
 s.onload = () => document.documentElement.classList.add("ready");
 document.body.appendChild(s);
 
+/* The page has usually finished loading by now (the awaits above), so register straight away in that case. */
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  const registerSW = () => navigator.serviceWorker.register("/sw.js").catch(() => {});
+  if (document.readyState === "complete") registerSW();
+  else addEventListener("load", registerSW);
 }

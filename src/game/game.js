@@ -766,14 +766,14 @@ function streakNow(){const s=store.get("streak",{last:null,n:0}),y=new Date();y.
 
 
 /* ---- re-rolls ---- */
-function rerollsLeft(){return S.daily?0:S.free+S.bank;}
+function rerollsLeft(){return S.daily||S.duel?0:S.free+S.bank;}
 function bumpPill(){const p=$("#rr");if(p){p.textContent=rerollsLeft();const b=p.closest(".pill");b.classList.remove("bump");void b.offsetWidth;b.classList.add("bump");}
   document.querySelectorAll("[data-rr]").forEach(e=>e.textContent=rerollsLeft()?`${rerollsLeft()} left`:"Get more");}
-function lockedReroll(label){return `<button class="gb gb-lock rrlock" disabled><span class="gb-in"></span><span class="gb-t">${IC.lock}${label} · NOT IN THE DAILY</span></button>`;}
+function lockedReroll(label){return `<button class="gb gb-lock rrlock" disabled><span class="gb-in"></span><span class="gb-t">${IC.lock}${label} · ${S.duel?"NOT IN DUELS":"NOT IN THE DAILY"}</span></button>`;}
 function rerollBtn(label,id){const n=rerollsLeft();return `<button class="reroll" id="${id}"><span class="dice" aria-hidden="true">🎲</span><span class="rr-t"><b>${label}</b><small data-rr>${n?n+" left":"Get more"}</small></span></button>`;}
 function spendRerolls(n,after){const have=S.free+S.bank;if(have>=n){let r=n;const f=Math.min(S.free,r);S.free-=f;r-=f;S.bank-=r;store.set("bank",S.bank);bumpPill();sfx.coin();after();}
   else{toast(`You need ${n} re-rolls, you have ${have}`);openStore(()=>spendRerolls(n,after));}}
-function useReroll(action){if(S.daily){toast("The Daily has no re-rolls");return;}
+function useReroll(action){if(S.daily){toast("The Daily has no re-rolls");return;}if(S.duel){toast("Duels have no re-rolls");return;}
   if(S.free>0)S.free--;else if(S.bank>0){S.bank--;store.set("bank",S.bank);}else{openStore(()=>useReroll(action));return;}
   bumpPill();action();}
 function openStore(after){
@@ -874,7 +874,7 @@ function setScene(){const r=document.documentElement.style;r.setProperty("--scen
 function topbar(){const e=energy(),ms=nextCanMs();
   return `<div class="hud"><button class="hud-logo" data-act="home" aria-label="Home"><span class="ballico"></span><span>DREAM <i>TEAM</i></span></button>
    <div class="hud-r"><button class="hpill" data-act="energy" aria-label="Energy ${e.e} of ${EMAX}, tap for more">${CAN}<span class="hv"><b data-en>${e.e}/${EMAX}</b><small data-en-t>${ms?fmtT(ms):"Full"}</small></span><i class="plus">+</i></button>
-    <button class="hpill" data-act="store" aria-label="Re-rolls, tap for more"><span class="hdice">🎲</span><span class="hv"><b id="rr">${S.daily&&!["home","binder","cabinet","shop"].includes(S.screen)?"–":S.free+S.bank}</b></span><i class="plus">+</i></button>
+    <button class="hpill" data-act="store" aria-label="Re-rolls, tap for more"><span class="hdice">🎲</span><span class="hv"><b id="rr">${S.daily&&!["home","binder","dream","ranks","cabinet","shop"].includes(S.screen)?"–":S.free+S.bank}</b></span><i class="plus">+</i></button>
     <button class="hicon" data-act="sound" aria-label="Sound ${S.sound?"on":"off"}">${S.sound?IC.sound:IC.mute}</button></div></div>`;}
 function refreshHUD(){const e=energy(),ms=nextCanMs();document.querySelectorAll("[data-en]").forEach(x=>x.textContent=`${e.e}/${EMAX}`);
   document.querySelectorAll("[data-en-t]").forEach(x=>x.textContent=ms?fmtT(ms):"Full");document.querySelectorAll("[data-en-next]").forEach(x=>x.textContent=fmtT(ms));
@@ -938,7 +938,7 @@ const NAV_SCREENS=["home","binder","cabinet","shop"];
 function render(){const app=$("#app");({home:vHome,year:vYear,draft:vDraft,name:vName,live:vLive,result:vResult,binder:vBinder,cabinet:vCabinet,shop:vShop})[S.screen](app);
   const on=NAV_SCREENS.includes(S.screen);document.body.classList.toggle("has-nav",on);let n=$("#navroot");if(!n){n=document.createElement("div");n.id="navroot";document.body.appendChild(n);}n.innerHTML=on?navHTML():"";}
 document.addEventListener("click",e=>{const a=e.target.closest("[data-act]");if(!a)return;const act=a.dataset.act;
-  if(act==="home"){if(["home","result","binder","cabinet","shop"].includes(S.screen)){go("home");return;}
+  if(act==="home"){if(["home","result","binder","dream","ranks","cabinet","shop"].includes(S.screen)){go("home");return;}
     const m=modal(`<h3>Leave this run?</h3><p>Your draft and tournament progress will be lost.</p><div class="actions two"><button class="btn ghost" data-close>Stay</button><button class="btn pink" id="leave">Leave</button></div>`);
     $("#leave",m).onclick=()=>{S.daily=null;go("home");};}
   if(act==="store")openStore();
@@ -1116,8 +1116,8 @@ function boardCard(res,full){const n=full?[4,3]:[3,2];
 function tableHTML(T,g){const rows=T.tables[g];return `<div class="tscroll"><table class="tbl"><thead><tr><th>#</th><th>Group ${g}</th><th>P</th><th>W</th><th>L</th><th>NRR</th><th>PTS</th></tr></thead><tbody>
   ${rows.map((r,i)=>{const t=teamOf(r.code);return `<tr class="${i<4?"q":""} ${t.isUser?"me":""}"><td>${i+1}</td><td><span class="tcell">${tcirc(t)}${esc(t.isUser?t.name:t.code)}</span></td><td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${(r.nrr>=0?"+":"")+r.nrr.toFixed(2)}</td><td><b>${r.pts}</b></td></tr>`;}).join("")}</tbody></table></div>`;}
 function vLive(app){const T=S.T,F=T.F,nodes=buildNodes(T);
-  app.innerHTML=`<div class="screen">${topbar()}
-   <div class="bc-head"><span class="live" id="livetag">LIVE</span><span class="bc-title">${esc(S.me.name)} at the ${F.short} WC ${T.year}</span>
+  app.innerHTML=`<div class="screen live-scr">${topbar()}
+   <div class="bc-head"><span class="live" id="livetag">LIVE</span><span class="bc-title"><span class="dt-ed ${T.fmt} bc-ed">${F.short} ${T.year}</span><span class="bc-nm">${esc(S.me.name)}</span></span>
     <div class="ctrls"><button class="ctrl" id="pp" aria-label="Pause">❚❚</button><button class="ctrl" id="spd" aria-label="Playback speed">${S.speed}×</button><button class="ctrl" id="ffw" aria-label="Skip to the next big moment">⏭</button></div></div>
    <div class="tl" id="tl">${nodes.map((n,i)=>(i?`<i class="tn-line" data-l="${n.k}"></i>`:"")+`<div class="tn-n ${n.big?"big":""}" data-k="${n.k}"><div class="tn-dot">${n.code?`<span class="tfl">${flagSVG(n.code)}</span>`:`<span>${n.label}</span>`}</div><small>${n.small}</small></div>`).join("")}</div>
    <div class="panel" id="stage"></div><div id="after"></div></div>`;
@@ -1139,15 +1139,17 @@ async function runLive(id){const T=S.T,alive=()=>id===S.runId;
       $("#sblast").textContent=`${teamOf(res.first.team).isUser?"YOU":teamOf(res.first.team).code} TO BAT`;
       await playInnings($("#r1"),res.first,m1,3400);if(!alive())return;
       $("#sblast").textContent=`TARGET ${res.first.runs+1}`;await wait(600);if(!alive())return;
-      await playInnings($("#r2"),res.second,m2,3600);if(!alive())return;
+      if(res.lo&&!S.ff&&!REDUCED){await playToLastOver($("#r2"),res,m2,3600);if(!alive())return;await lastOverBBB(res,alive);if(!alive())return;}else{await playInnings($("#r2"),res.second,m2,3600);if(!alive())return;}
+      if(res.so&&!S.ff&&!REDUCED){await superOverBBB(res,alive);if(!alive())return;}
       $("#sblast").textContent=`${teamOf(res.winner).isUser?"YOU":teamOf(res.winner).code} WIN`;placards(won?"WE WON!":"OH NO!","",won?"YOU":teamOf(res.winner).code,res.summary.replace("won by ","by "));{const c=$("#mcap");if(c)c.innerHTML=`<span class="ov">FT</span>${esc(teamOf(res.winner).name)} ${esc(res.summary)}`;}
       const ko=T.phase==="done"&&T.champion!=="YOU";
       $("#mres").innerHTML=`${ko?`<p class="ko-note">KNOCKED OUT IN THE ${STAGE_NAME[T.out].toUpperCase()}</p>`:""}<span class="stamp ${won?"w":"l"}">${won?"YOU WON":"YOU LOST"}</span><p>${esc(teamOf(res.winner).name)} ${res.summary}</p>${kmHTML(S.km)}`;
+      {const m=$("#mres");if(m&&!S.ff){const r=m.getBoundingClientRect();if(r.top<60||r.top>innerHeight*.6)m.scrollIntoView({block:"center",behavior:REDUCED?"auto":"smooth"});}}
       {const nn=$("#neon");if(nn){nn.classList.add("full");nn.innerHTML=boardCard(res,ko);}else $("#scw").innerHTML=boardCard(res,ko);["#moment",".wbar"].forEach(s=>{const e=$(s);if(e){e.classList.add("bye");setTimeout(()=>e.remove(),320);}});}setNode(k,won?"w":"l");
       if(won){sfx.win();if(!S.ff)confetti(50);}else{sfx.lose();buzz([60,40,60]);}
       if(T.phase==="done"){S.ff=false;$("#livetag").classList.add("off");
         if(T.champion==="YOU"){confetti(200);stampFly("CHAMPIONS!");sfx.legend();$("#nb").innerHTML=`<div class="actions">${gbtn("🏆 LIFT THE TROPHY","gold","lift")}</div>`;$("#lift").onclick=()=>go("result");}
-        else{deadAfter(k);$("#nb").innerHTML=`<div class="actions">${gbtn("SEE HOW THE CUP ENDED","cyan","fin")}</div>`;$("#fin").onclick=()=>go("result");}
+        else{deadAfter(k);$("#nb").innerHTML=`<div class="actions">${koReplayHTML(T)}${gbtn("SEE HOW THE CUP ENDED","cyan","fin")}</div>`;$("#fin").onclick=()=>go("result");koReplayBind();}
         return;}
       let label;if(T.phase==="group"){label=`game ${T.qi+1} v ${teamOf(T.queue[T.qi].b).name}`;}else if(T.phase==="table")label="the group table";
       else{startKO(T,T.pendingNext);const m=T.ko[T.phase].find(x=>x.a==="YOU");label=`${STAGE_NAME[T.phase]} v ${teamOf(m.b).name}`;}
@@ -1225,7 +1227,7 @@ function loadImg(src){return new Promise(res=>{const i=new Image();i.onload=()=>
 const svgURL=s=>"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s);
 function grad(x,X,Y,X2,Y2,cols){const g=x.createLinearGradient(X,Y,X2,Y2);cols.forEach((c,i)=>g.addColorStop(i/(cols.length-1),c));return g;}
 function drawCard(x,p,cx,yb,w,img){const h=w*1.42,X=cx-w/2,Y=yb-h,t=TIER_C[rarity(p.r)];
-  x.save();x.filter="blur(14px)";x.fillStyle="rgba(0,20,8,.55)";x.beginPath();x.ellipse(cx,yb+10,w*.62,w*.17,0,0,7);x.fill();x.restore();
+  x.save();x.translate(cx,yb+12);x.scale(1,.3);{const R=w*.86,sg=x.createRadialGradient(0,0,0,0,0,R);sg.addColorStop(0,"rgba(0,22,8,.6)");sg.addColorStop(.35,"rgba(0,22,8,.42)");sg.addColorStop(.7,"rgba(0,22,8,.12)");sg.addColorStop(1,"rgba(0,22,8,0)");x.fillStyle=sg;x.beginPath();x.arc(0,0,R,0,7);x.fill();}x.restore();
   x.save();x.shadowColor="rgba(0,10,4,.55)";x.shadowBlur=34;x.shadowOffsetY=w*.1;rr(x,X,Y,w,h,w*.09);x.fillStyle="rgba(0,0,0,.4)";x.fill();x.restore();
   x.save();if(t.glow){x.shadowColor=t.glow;x.shadowBlur=30;}rr(x,X,Y,w,h,w*.09);x.fillStyle=grad(x,X,Y,X+w,Y+h,t.edge);x.fill();x.restore();
   rr(x,X+4,Y+4,w-8,h-8,w*.075);x.fillStyle=grad(x,X,Y,X+w*.6,Y+h,t.cb);x.fill();
@@ -1312,7 +1314,7 @@ function emptyMini(s){return `<div class="mc2 empty"><span>+</span><b>${s.role==
 function gbtn(label,kind="cyan",id="",extra=""){return `<button class="gb gb-${kind}" ${id?`id="${id}"`:""} ${extra}><span class="gb-in"></span><span class="gb-gl"></span><span class="gb-t">${label}</span></button>`;}
 const PLAYI='<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>';
 const DICEI='<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="#FFFFFF"/><circle cx="8" cy="8" r="1.8" fill="#7C3AED"/><circle cx="16" cy="16" r="1.8" fill="#7C3AED"/><circle cx="12" cy="12" r="1.8" fill="#7C3AED"/></svg>';
-function lockedReroll(label){return `<button class="gb gb-lock rrlock" disabled><span class="gb-in"></span><span class="gb-t">${IC.lock}${label} · NOT IN THE DAILY</span></button>`;}
+function lockedReroll(label){return `<button class="gb gb-lock rrlock" disabled><span class="gb-in"></span><span class="gb-t">${IC.lock}${label} · ${S.duel?"NOT IN DUELS":"NOT IN THE DAILY"}</span></button>`;}
 function rerollBtn(label,id){const n=rerollsLeft();return gbtn(`${DICEI}${label} · <span data-rr>${n?n+" left":"Get more"}</span>`,"violet",id);}
 function bumpPill(){const p=$("#rr");if(p){p.textContent=rerollsLeft();const b=p.closest(".hpill");if(b){b.classList.remove("bump");void b.offsetWidth;b.classList.add("bump");}}
   document.querySelectorAll("[data-rr]").forEach(e=>e.textContent=rerollsLeft()?`${rerollsLeft()} left`:"Get more");}
@@ -1322,11 +1324,11 @@ function xpInfo(){const xp=store.get("xp",0);return {lv:1+Math.floor(xp/2000),pc
 function legendTotals(){const b=binder();let have=0,all=0;["odi","t20"].forEach(f=>allCards(f).forEach(p=>{if(p.r>=90){all++;if(b[cardKey(p)])have++;}}));return [have,all];}
 
 /* ---------- HUD ---------- */
-function topbar(){const e=energy(),ms=nextCanMs(),lt=store.get("lastTeam",null),xi=xpInfo(),hub=["home","binder","cabinet","shop"].includes(S.screen);
+function topbar(){const e=energy(),ms=nextCanMs(),lt=store.get("lastTeam",null),xi=xpInfo(),hub=["home","binder","dream","ranks","cabinet","shop"].includes(S.screen);
   return `<div class="hud"><button class="hprof" data-act="home" aria-label="${hub?"Your profile":"Home"}">
    <span class="hp-fl">${flagSVG(lt?{isUser:true,flag:lt.flag}:"YOU")}</span><span class="hp-t"><b>${esc(lt?lt.name:"DREAM TEAM")}</b><span><small>LV ${xi.lv}</small><i><em style="width:${xi.pct}%"></em></i></span></span></button>
    <div class="hud-r"><button class="hpill" data-act="energy" aria-label="Energy ${e.e} of ${EMAX}, tap for more">${CAN}<span class="hv"><b data-en>${e.e}/${EMAX}</b><small data-en-t>${ms?fmtT(ms):"Full"}</small></span><i class="plus">+</i></button>
-    <button class="hpill" data-act="store" aria-label="Re-rolls, tap for more"><svg class="hdie" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hdg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5B5FF"/><stop offset=".5" stop-color="#C026D3"/><stop offset="1" stop-color="#6D28D9"/></linearGradient></defs><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="url(#hdg)"/><circle cx="8" cy="8" r="1.8" fill="#fff"/><circle cx="16" cy="16" r="1.8" fill="#fff"/><circle cx="12" cy="12" r="1.8" fill="#fff"/></svg><span class="hv"><b id="rr">${S.daily&&!hub?"–":S.free+S.bank}</b></span><i class="plus">+</i></button>
+    <button class="hpill" data-act="store" aria-label="Re-rolls, tap for more"><svg class="hdie" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hdg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5B5FF"/><stop offset=".5" stop-color="#C026D3"/><stop offset="1" stop-color="#6D28D9"/></linearGradient></defs><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="url(#hdg)"/><circle cx="8" cy="8" r="1.8" fill="#fff"/><circle cx="16" cy="16" r="1.8" fill="#fff"/><circle cx="12" cy="12" r="1.8" fill="#fff"/></svg><span class="hv"><b id="rr">${(S.daily||S.duel)&&!hub?"–":S.free+S.bank}</b></span><i class="plus">+</i></button>
     <button class="hicon" data-act="sound" aria-label="Sound ${S.sound?"on":"off"}">${S.sound?IC.sound:IC.mute}</button></div></div>`;}
 function navHTML(){return `<nav class="bnav2" aria-label="Main">${NAV.map(([k,l,i])=>k==="home"?`<button class="bn2 play ${S.screen===k?"on":""}" data-nav="home" ${S.screen===k?'aria-current="page"':""}><span class="hex">${IC.play}</span><span>${l}</span></button>`:`<button class="bn2 ${S.screen===k?"on":""}" data-nav="${k}" ${S.screen===k?'aria-current="page"':""}>${IC[i]}<span>${l}</span></button>`).join("")}</nav>`;}
 
@@ -1395,10 +1397,10 @@ function vYear(app){const F=FORMATS[S.fmt],years=Object.keys(ED()).map(Number);
   w.hub.onclick=()=>spin();
   function show(){const Y=ED()[S.year],fin=FINALS[S.fmt][S.year],champ=Y.champ,fst=STADIA[FINAL_ST[S.fmt][S.year]];confetti(70);sfx.legend();
     $("#out").innerHTML=`<section class="champ6 reveal"><div class="c6-in">
-      <div class="c6-top"><span class="c6-yr">${S.year}</span><span class="c6-ch"><small>REAL CHAMPIONS</small><span>${flagSVG(champ,"flag c6-fl")}<b>${esc(TEAMS[champ][0].toUpperCase())}</b></span></span></div>
+      <div class="c6-top"><span class="c6-yr">${S.year}<span class="dt-ed ${S.fmt} c6-fmt">${FORMATS[S.fmt].short}</span></span><span class="c6-ch"><small>REAL CHAMPIONS</small><span>${flagSVG(champ,"flag c6-fl")}<b>${esc(TEAMS[champ][0].toUpperCase())}</b></span></span></div>
       <div class="c6-chips"><span>${esc(Y.host)}</span><span>${Object.keys(Y.teams).length} teams</span><span>Final at ${esc(fst.name)}</span></div>
       <p class="c6-fact"><b>What happened:</b> ${esc(Y.note)} ${esc(fin.line)}.</p></div></section>
-     <div class="actions">${gbtn(`${PLAYI}PICK YOUR TEAM`,"cyan","draft")}${S.daily?lockedReroll("RE-ROLL THE YEAR"):rerollBtn("RE-ROLL THE YEAR","rey")}</div>`;
+     <div class="actions">${gbtn(`${PLAYI}PICK YOUR TEAM`,"cyan","draft")}${(S.daily||S.duel)?lockedReroll("RE-ROLL THE YEAR"):rerollBtn("RE-ROLL THE YEAR","rey")}</div>`;
     $("#draft").onclick=()=>go("draft");const rb=$("#rey");if(rb)rb.onclick=()=>useReroll(()=>spin(S.year));
     $("#out").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"});}}
 
@@ -1424,16 +1426,16 @@ function vDraft(app){
    <div class="scrim" id="scrim"></div><div class="sheet" id="sheet" role="dialog" aria-label="Choose a player"></div><div id="revealroot"></div>`;
   fitStage();$("#gbal").onclick=openBalance;
   const rl=makeReel($("#reelhost",app),codes),sb=$("#spin");let cur=null;
-  async function spin(ex){if(S.busy||pickCount()>=11)return;S.busy=true;sb.classList.add("busy");$("#gdock").classList.remove("ready");$("#gdbtns").hidden=true;$("#hint").textContent="Spinning…";let c;
+  async function spin(ex){if(S.busy||pickCount()>=11)return;if(cur&&ex===undefined){openSheet(cur);return;}S.busy=true;sb.classList.add("busy");$("#gdock").classList.remove("ready");$("#gdbtns").hidden=true;$("#hint").textContent="Spinning…";let c;
     const src=S.daily;if(src){do{c=src.seq[src.si++%src.seq.length];}while(!eligible(c));}
     else{let pool=codes.filter(x=>x!==ex&&eligible(x));if(!pool.length)pool=codes.filter(eligible);c=pool[Math.floor(VR()*pool.length)];}
     await spinReel(rl,codes.indexOf(c));cur=c;roar(.7,.06);
-    $("#hint").innerHTML=`<b>${esc(TEAMS[c][0])}!</b> Your cards come up next.`;$("#gdrr").innerHTML=S.daily?lockedReroll("RE-ROLL"):rerollBtn("RE-ROLL","rr3");const r3=$("#rr3");if(r3)r3.onclick=()=>useReroll(()=>{closeSheet();setTimeout(()=>spin(c),250);});$("#gdbtns").hidden=false;const sc=$("#showc");sc.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg>PICK A PLAYER`;sc.onclick=()=>openSheet(c);
-    setTimeout(()=>{S.busy=false;sb.classList.remove("busy");openSheet(c);},REDUCED?100:600);}
+    $("#hint").innerHTML=`<b>${esc(TEAMS[c][0])}!</b> Your cards come up next.`;$("#gdrr").innerHTML=(S.daily||S.duel)?lockedReroll("RE-ROLL"):rerollBtn("RE-ROLL","rr3");const r3=$("#rr3");if(r3)r3.onclick=()=>useReroll(()=>{closeSheet();setTimeout(()=>spin(c),250);});$("#gdbtns").hidden=false;const sc=$("#showc");sc.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg>PICK A PLAYER`;sc.onclick=()=>openSheet(c);
+    setTimeout(()=>{S.busy=false;sb.classList.remove("busy");sb.disabled=true;sb.classList.add("held");openSheet(c);},REDUCED?100:600);}
   sb.onclick=()=>spin();
   function openSheet(code){const [name,col]=TEAMS[code],sq=squad(S.fmt,S.year,code),bd=binder();
     $("#sheet").innerHTML=`<div class="sheet-head6" style="--tc:${col}"><span class="sh-flag">${flagSVG(code)}</span><div class="sh-txt"><div class="sh-name">${esc(name.toUpperCase())}</div><div class="sh-sub">Pick 1 player · ${sq.length} cards · ${F.short} ${S.year}</div></div><button class="sh-x" id="shx" aria-label="Close and look at the ground"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-      <div class="sh-rr">${S.daily?lockedReroll("RE-ROLL COUNTRY"):rerollBtn("RE-ROLL COUNTRY","rr2")}</div>
+      <div class="sh-rr">${(S.daily||S.duel)?lockedReroll("RE-ROLL COUNTRY"):rerollBtn("RE-ROLL COUNTRY","rr2")}</div>
       <div class="sheet-body6">${sq.map((p,i)=>{const used=inXI(p),sl=used?null:slotFor(p),off=used||!sl;
         const why=used?"Already in your XI":!sl?`No ${ROLES[p.role].short} slot left`:`Goes to <b>${sl.role==="X"?"Flex":ROLES[sl.role].name}</b>${sl.role==="X"?`<em class="ft">${flexTag(p)}</em>`:""}`;
         return `<div class="cardcell6">${cardHTML(p,{btn:true,i,off,isNew:!bd[cardKey(p)]})}<span class="tc-why">${why}</span></div>`;}).join("")}</div>`;
@@ -1453,11 +1455,11 @@ function vDraft(app){
      <div class="rv6-act">${gbtn("ADD TO MY XI","gold","rvadd")}<button class="rv6-back" id="rvback">Back to the ${esc(TEAMS[code][0])} cards</button></div></div>`;
     if(rar==="legend"){sfx.legend();confetti(90,["#FFC93D","#FFE88A","#FFFFFF","#FF8A00"]);stampFly("LEGEND!");buzz([20,40,20]);}else if(rar==="elite"){sfx.pick();stampFly("ELITE!","elite");}else sfx.pick();
     $("#rvback").onclick=()=>{$("#revealroot").innerHTML="";};$("#rvadd").onclick=()=>{$("#revealroot").innerHTML="";pick(p);};$("#rvadd").focus();}
-  function pick(p){const s=slotFor(p);if(!s)return;S.picks[s.id]=p;closeSheet();$("#gdbtns").hidden=true;const isNew=addToBinder(p);
+  function pick(p){const s=slotFor(p);if(!s)return;S.picks[s.id]=p;closeSheet();$("#gdbtns").hidden=true;cur=null;sb.disabled=false;sb.classList.remove("held");const isNew=addToBinder(p);
     $("#gfield").innerHTML=groundField(S.picks,s.id);$("#dots").innerHTML=dotsHTML();$("#avg").textContent=avgTxt();const n=pickCount();$("#prog").textContent=`PICK ${Math.min(11,n+1)}/11`;
-    if(isNew)setTimeout(()=>toast("📚 New card added to your collection"),300);
+    
     if(n>=11){$("#hint").textContent="Squad complete!";sb.disabled=true;setTimeout(()=>{confetti(140);sfx.win();go("name");},1200);}
-    else{$("#hint").textContent="Spin for your next player";$("#gdock").classList.add("ready");}$("#gbal").innerHTML=balChips();if(typeof duelProgress==="function")duelProgress();}
+    else{$("#hint").textContent="Next spin coming…";$("#gdock").classList.add("ready");setTimeout(autoSpinNext,1100);}$("#gbal").innerHTML=balChips();if(typeof duelProgress==="function")duelProgress();}
 }
 function avgTxt(){const v=Object.values(S.picks);return v.length?`XI avg ${Math.round(v.reduce((a,p)=>a+p.r,0)/v.length)}`:"Flex takes any role";}
 /* ground preview (name screen) */
@@ -1761,10 +1763,10 @@ function vYear(app){const F=FORMATS[S.fmt],years=Object.keys(ED()).map(Number);
   w.hub.onclick=()=>spin();$("#bigspin").onclick=()=>spin();
   function show(){const Y=ED()[S.year],fin=FINALS[S.fmt][S.year],champ=Y.champ,fst=STADIA[FINAL_ST[S.fmt][S.year]];confetti(70);sfx.legend();
     $("#out").innerHTML=`<section class="champ6 reveal"><div class="c6-in">
-      <div class="c6-top"><span class="c6-yr">${S.year}</span><span class="c6-ch"><small>REAL CHAMPIONS</small><span>${flagSVG(champ,"flag c6-fl")}<b>${esc(TEAMS[champ][0].toUpperCase())}</b></span></span></div>
+      <div class="c6-top"><span class="c6-yr">${S.year}<span class="dt-ed ${S.fmt} c6-fmt">${FORMATS[S.fmt].short}</span></span><span class="c6-ch"><small>REAL CHAMPIONS</small><span>${flagSVG(champ,"flag c6-fl")}<b>${esc(TEAMS[champ][0].toUpperCase())}</b></span></span></div>
       <div class="c6-chips"><span>${esc(Y.host)}</span><span>${Object.keys(Y.teams).length} teams</span><span>Final at ${esc(fst.name)}</span></div>
       <p class="c6-fact"><b>What happened:</b> ${esc(Y.note)} ${esc(fin.line)}.</p></div></section>
-     <div class="actions">${gbtn(`${PLAYI}PICK YOUR TEAM`,"cyan","draft")}${S.daily?lockedReroll("RE-ROLL THE YEAR"):rerollBtn("RE-ROLL THE YEAR","rey")}</div>`;
+     <div class="actions">${gbtn(`${PLAYI}PICK YOUR TEAM`,"cyan","draft")}${(S.daily||S.duel)?lockedReroll("RE-ROLL THE YEAR"):rerollBtn("RE-ROLL THE YEAR","rey")}</div>`;
     $("#draft").onclick=()=>go("draft");const rb=$("#rey");if(rb)rb.onclick=()=>useReroll(()=>spin(S.year));
     $("#out").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"});}}
 
@@ -1772,12 +1774,12 @@ function vYear(app){const F=FORMATS[S.fmt],years=Object.keys(ED()).map(Number);
 vName=function(app){const me=buildMe(),venue=FINAL_ST[S.fmt][S.year];
   const rivals=Object.keys(ED()[S.year].teams).map(c=>makeTeam(c,TEAMS[c][0],TEAMS[c][1],bestXI(squad(S.fmt,S.year,c)),false));
   const all=[...rivals,me].sort((a,b)=>b.ovr-a.ovr),pos=all.indexOf(me),show=all.slice(0,5);if(pos>=5)show.push(me);
-  app.innerHTML=`<div class="screen">${topbar()}<h2 class="t6">YOUR DREAM TEAM <span>IS READY</span></h2>
+  app.innerHTML=`<div class="screen">${topbar()}${S.duel?"":edPill(S.fmt,S.year,S.daily?`DAILY #${S.daily.no}`:"")}<h2 class="t6">YOUR DREAM TEAM <span>IS READY</span></h2>
    <div class="hero7 sm">${heroHTML(S.team,false)}</div>
+   <div class="actions cta-top">${gbtn(`${PLAYI}GO LIVE`,"cyan","enter")}</div>
    <div class="panel"><div class="ph">ON THE GROUND<small>OVR ${Math.round(me.ovr)} · BAT ${me.bat} · BOWL ${me.bowl}</small></div>${arenaHTML(venue,"YOU",S.picks)}</div>
    ${balPanel(me)}
-   <div class="panel"><div class="ph">POWER RANKING<small>You're #${pos+1} of ${all.length}</small></div><div class="pb"><div class="rank">${show.map(t=>`<div class="rank-r ${t.isUser?"me":""}"><b>${all.indexOf(t)+1}</b>${tcirc(t.isUser?{isUser:true,flag:S.team.flag}:t)}<span>${esc(t.isUser?S.team.name:t.name)}</span><b>${Math.round(t.ovr)}</b></div>`).join("")}</div></div></div>
-   <div class="actions">${gbtn(`${PLAYI}GO LIVE`,"cyan","enter")}</div></div>`;
+   <div class="panel"><div class="ph">POWER RANKING<small>You're #${pos+1} of ${all.length}</small></div><div class="pb"><div class="rank">${show.map(t=>`<div class="rank-r ${t.isUser?"me":""}"><b>${all.indexOf(t)+1}</b>${tcirc(t.isUser?{isUser:true,flag:S.team.flag}:t)}<span>${esc(t.isUser?S.team.name:t.name)}</span><b>${Math.round(t.ovr)}</b></div>`).join("")}</div></div></div></div>`;
   $("#enter").onclick=()=>{S.me=buildMe();store.set("lastTeam",{name:S.team.name,flag:S.team.flag});
     setSeed(S.daily?hashStr(S.daily.date+"|"+S.me.xi.map(p=>p.name).join(",")):null);S.T=newTournament(S.fmt,S.year,S.me);S.T.teams.YOU.flag=S.me.flag;S.scored=false;go("live");};};
 
@@ -1956,7 +1958,7 @@ function duelRecord(){const v=Object.values(dRecs());return {w:v.filter(r=>r.res
 const DPTS={G:40,QF:150,SF:200,F:400};
 function runDuel(d){setSeed(hashStr("duel|"+d.id+"|"+d.seed));
   const F=FORMATS[d.fmt],ed=F.ed[d.year];
-  const mk=(code,t)=>{const x=makeTeam(code,t.name,t.flag.c[0],t.xi,true);x.flag=t.flag;return x;};
+  const mk=(code,t)=>{const x=makeTeam(code,t.name,t.flag.c[0],t.xi,true);x.flag=t.flag;if(t.cap!=null)capApply(x,t.cap);return x;};
   const A=mk("P1",d.host),B=mk("P2",d.guest);
   const others=shuffle(Object.keys(ed.teams).sort().map(c=>makeTeam(c,TEAMS[c][0],TEAMS[c][1],bestXI(squad(d.fmt,d.year,c)),false)));
   const N=others.length+2,sizeA=Math.ceil(N/2);
@@ -2056,7 +2058,7 @@ function dbState(r,ib){if(ib.gt){const t=safeTeam(ib.gt,r.fmt,r.year);if(t)retur
   if(ib.st==="declined")return {k:"declined"};if(ib.st==="drafting"||ib.st==="accepted")return {k:"drafting",n:Math.max(0,Math.min(11,Math.round(+ib.n)||0))};return {k:"inbox"};}
 
 /* ---------- draft hooks ---------- */
-function startDuelDraft(id){const r=dGet(id);if(!r)return;ac();setSeed(null);S.daily=null;S.fmt=r.fmt;S.year=r.year;S.picks={};S.free=1;S.T=null;
+function startDuelDraft(id){const r=dGet(id);if(!r)return;ac();setSeed(null);S.daily=null;S.fmt=r.fmt;S.year=r.year;S.picks={};S.free=0;S.T=null;
   const t=myTeam()||{name:pickV(NAMES),flag:randomFlag()};S.team={name:t.name,flag:{...t.flag,c:[...t.flag.c]}};
   S.duel={id,role:r.role};S.venue=FINAL_ST[r.fmt][r.year];go("draft");}
 function duelProgress(){if(!S.duel)return;const r=dGet(S.duel.id);if(!r||r.role!=="guest")return;const n=pickCount();
@@ -2308,6 +2310,1792 @@ if(/^#duel=/.test(location.hash))setTimeout(()=>{if(!myTeam()){const m=location.
 
 /* Live/inbox availability follows the server connection */
 if(ACC())ACC().onConnection(()=>{if(S.screen==="duel")render();});
+
+/* ===================== v8: DREAM PACKS + DREAM TEAM COLLECTION ===================== */
+/* Every finished game earns a Dream Pack of three cards: ODI and T20 World Cups, the Daily and duels.
+   The further your team goes, the better each card's odds. Cards won from packs make up the
+   Dream Team collection, and Dream Teams are built only from those cards (not from drafted players). */
+
+/* ---------- odds: % per card for Legend, Elite, Star, Squad, by how far you got ---------- */
+const PACK_TIER={
+  group:{name:"Group stage",pack:"Stadium Pack",odds:[1.5,6.5,27,65]},
+  qf:{name:"Quarter-finalists",pack:"Quarter-final Pack",odds:[2.5,9.5,31,57]},
+  sf:{name:"Semi-finalists",pack:"Semi-final Pack",odds:[3.5,12.5,35,49]},
+  final:{name:"Finalists",pack:"Finalist Pack",odds:[5,16,39,40]},
+  champ:{name:"Champions",pack:"Champions Pack",odds:[5,16,42,37],guar:[12,88]}};  /* guar: one card is always Legend 12% or Elite 88% */
+const PACK_STEPS=["group","qf","sf","final","champ"],TIERS4=["legend","elite","star","squad"];
+const legendPerPack=fin=>{const T=PACK_TIER[fin],g=T.guar?1:0;return 1-Math.pow(1-T.odds[0]/100,3-g)*(g?1-T.guar[0]/100:1);};
+const packOddsLine=(fin,short)=>short?`${PACK_TIER[fin].guar?"Elite+ guaranteed · ":""}Legend ${oneIn(legendPerPack(fin))}`:`${PACK_TIER[fin].guar?"Elite or Legend guaranteed · ":""}Legend chance ${oneIn(legendPerPack(fin))}`;
+const oneIn=x=>"1 in "+Math.max(2,Math.round(1/x));
+/* pack rolls never touch the seeded match RNG (duels and the Daily must stay deterministic) */
+function prand(){try{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296;}catch(e){return Math.random();}}
+
+/* ---------- card index and pools ---------- */
+let _cIdx=null,_cPool=null;
+function cardIdx(){if(!_cIdx){_cIdx=new Map();_cPool={};
+  ["odi","t20"].forEach(f=>{_cPool[f]={};TIERS4.forEach(t=>_cPool[f][t]={all:[],yr:{}});
+    allCards(f).forEach(p=>{const k=cardKey(p);if(_cIdx.has(k))return;_cIdx.set(k,p);const b=_cPool[f][rarity(p.r)];b.all.push(p);(b.yr[p.year]=b.yr[p.year]||[]).push(p);});});}
+  return _cIdx;}
+const cardByKey=k=>cardIdx().get(k)||null;
+function rollTier(fin){let x=prand()*100;const o=PACK_TIER[fin].odds;for(let i=0;i<4;i++){x-=o[i];if(x<0)return TIERS4[i];}return "squad";}
+/* every card comes from the World Cup that was played; an edition short of a tier drops to the next one */
+function rollPack(fmt,year,fin){cardIdx();const P=_cPool[fmt]||_cPool.odi,T=PACK_TIER[fin],out=[];
+  for(let i=0;i<3;i++){let t=T.guar&&i===0?(prand()*100<T.guar[0]?"legend":"elite"):rollTier(fin),ti=TIERS4.indexOf(t),pool=P[t].yr[year];
+    while((!pool||!pool.length)&&ti<3){t=TIERS4[++ti];pool=P[t].yr[year];}
+    if(!pool||!pool.length)pool=P[t].all;
+    let p,n=0;do{p=pool[Math.floor(prand()*pool.length)];}while(out.includes(cardKey(p))&&++n<25);
+    out.push(cardKey(p));}
+  for(let i=out.length-1;i>0;i--){const j=Math.floor(prand()*(i+1));[out[i],out[j]]=[out[j],out[i]];}
+  return out;}
+
+/* ---------- storage: unopened packs, the collection (card -> copies), Dream Teams ---------- */
+const packQ=()=>{const q=store.get("packs",[]);return Array.isArray(q)?q.filter(p=>p&&Array.isArray(p.cards)&&PACK_TIER[p.fin]&&FORMATS[p.fmt]):[];};
+const dcol=()=>{const c=store.get("dcol",{});return c&&typeof c==="object"?c:{};};
+function awardPack(o){const fin=PACK_TIER[o.fin]?o.fin:"group",fmt=FORMATS[o.fmt]?o.fmt:"odi";
+  const p={id:Date.now().toString(36)+Math.floor(prand()*1e8).toString(36),fmt,year:+o.year,fin,src:o.src||fmt,won:o.won?1:0,cards:rollPack(fmt,o.year,fin),ts:Date.now()};
+  const q=packQ();q.push(p);store.set("packs",q.slice(-40));return p;}
+function claimPack(id){const q=packQ(),i=q.findIndex(x=>x.id===id);if(i<0)return null;const p=q[i],c=dcol();
+  const res=p.cards.map(k=>{const isNew=!c[k];c[k]=(c[k]||0)+1;return {k,p:cardByKey(k),isNew,n:c[k]};}).filter(x=>x.p);
+  store.set("dcol",c);q.splice(i,1);store.set("packs",q);store.set("packsOpened",store.get("packsOpened",0)+1);return {pack:p,res};}
+function dcolList(){const c=dcol();return Object.keys(c).map(k=>({k,p:cardByKey(k),n:c[k]})).filter(x=>x.p).sort((a,b)=>b.p.r-a.p.r||a.p.name.localeCompare(b.p.name));}
+function packSrc(p){return `${p.src==="daily"?"DAILY · ":p.src==="duel"?"DUEL · ":""}${FORMATS[p.fmt].short} WORLD CUP ${p.year}`;}
+
+/* ---------- the pack: foil art, torn along a zigzag line near the top ---------- */
+const TEAR_Y=17;
+function zigPts(y,teeth,amp){const pts=[];for(let i=0;i<=teeth;i++)pts.push(`${(i/teeth*100).toFixed(2)}% ${(y+(i%2?amp:-amp)).toFixed(2)}%`);return pts;}
+function packFace(p){const T=PACK_TIER[p.fin];
+  return `<span class="dp-foil"></span><span class="dp-holo"></span><i class="dp-crimp t"></i><i class="dp-crimp b"></i>
+   <span class="dp-tearlbl">TEAR TO OPEN</span><i class="dp-perf" style="top:${TEAR_Y}%"></i>
+   <span class="dp-logo"><b>DREAM <em>TEAM</em></b><small>CRICKET DRAFT GAME</small></span>
+   <span class="dp-emb">${G.ball}</span>
+   <span class="dp-name"><small>${esc(T.pack.toUpperCase())}</small><b>DREAM PACK</b></span>
+   <span class="dp-meta">${FORMATS[p.fmt].short} ${p.year} · 3 CARDS</span><i class="dp-shine"></i>`;}
+function packHTML(p,cls=""){const z=zigPts(TEAR_Y,18,1.1),top=`polygon(0% 0%,100% 0%,${[...z].reverse().join(",")})`,bot=`polygon(${z.join(",")},100% 100%,0% 100%)`;
+  return `<span class="dp-pack f-${p.fin} ${cls}"><span class="dp-half dp-bot" style="clip-path:${bot};-webkit-clip-path:${bot}">${packFace(p)}</span><span class="dp-half dp-top" style="clip-path:${top};-webkit-clip-path:${top}">${packFace(p)}</span><i class="dp-rip" style="top:${TEAR_Y}%"></i></span>`;}
+const CARD_BACK=`<span class="dpc-bk"><i class="dpc-bk-ring"></i><b>DT</b><small>DREAM TEAM</small></span>`;
+
+/* ---------- opening a pack: drop in, tap, shake, tear, three cards rise, fan out and flip ---------- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function anim(el,kf,o){if(!el||!el.animate)return Promise.resolve();try{return el.animate(kf,{fill:"forwards",...o}).finished.catch(()=>{});}catch(e){return Promise.resolve();}}
+/* a temporary animation that hands back to CSS when it ends (so CSS idle loops keep working) */
+function animT(el,kf,o){if(!el||!el.animate)return Promise.resolve();try{const a=el.animate(kf,o);return a.finished.then(()=>a.cancel()).catch(()=>{});}catch(e){return Promise.resolve();}}
+const RAR_RANK={squad:0,star:1,elite:2,legend:3};
+function openPackFlow(id,after){const q=packQ(),p=(id&&q.find(x=>x.id===id))||q[0];if(!p||$(".dpo"))return;closeModal();
+  const T=PACK_TIER[p.fin],cards=p.cards.map(cardByKey).filter(Boolean),more=()=>packQ().length;
+  const root=document.createElement("div");root.className="dpo";root.setAttribute("role","dialog");root.setAttribute("aria-modal","true");root.setAttribute("aria-label","Dream Pack");
+  root.innerHTML=`<i class="dpo-rays f-${p.fin}"></i>
+   <div class="dpo-head"><small>${esc(packSrc(p))}</small><b>${p.won?"DUEL WON · ":""}${esc(T.name.toUpperCase())}</b><button class="dpo-odds" id="dpodds">${packOddsLine(p.fin,true)} · odds</button></div>
+   <div class="dpo-stage" id="dpstage"><i class="dpo-burst f-${p.fin}" id="dpburst"></i>
+    <div class="dpo-cards" id="dpcards">${cards.map((c,i)=>`<div class="dpc r-${rarity(c.r)}" data-i="${i}"><div class="dpc-in"><div class="dpc-face dpc-back">${CARD_BACK}</div><div class="dpc-face dpc-front">${cardHTML(c)}</div></div><span class="dpc-tag" hidden></span></div>`).join("")}</div>
+    <button class="dpo-packbtn" id="dppack" aria-label="Tap to open your Dream Pack">${packHTML(p)}</button></div>
+   <p class="dpo-tap" id="dptap" aria-live="polite">TAP THE PACK TO OPEN</p>
+   <div class="dpo-foot" id="dpfoot" hidden></div>
+   <button class="dpo-later" id="dplater">Open it later</button>`;
+  document.body.appendChild(root);document.body.classList.add("dpo-on");
+  const $r=s=>root.querySelector(s),pk=$r(".dp-pack"),btn=$r("#dppack"),cardEls=[...root.querySelectorAll(".dpc")];
+  let state="ready",fast=false;
+  const close=()=>{root.remove();document.body.classList.remove("dpo-on");removeEventListener("keydown",onKey);if(after)after();};
+  const onKey=e=>{if(e.key==="Escape"&&(state==="ready"||state==="done"))close();};addEventListener("keydown",onKey);
+  $r("#dplater").onclick=close;$r("#dpodds").onclick=()=>openOdds();
+  /* arrival */
+  if(REDUCED){pk.classList.add("idle");}
+  else{sfx.deal();animT(pk,[{transform:"translateY(-115vh) rotate(-14deg)"},{transform:"translateY(18px) rotate(4deg)",offset:.72},{transform:"translateY(-6px) rotate(-1deg)",offset:.88},{transform:"none"}],{duration:950,easing:"cubic-bezier(.2,.75,.3,1)"})
+    .then(()=>{sfx.land();buzz(15);if(state==="ready")pk.classList.add("idle");});}
+  btn.onclick=()=>{if(state!=="ready")return;state="opening";open();};
+  async function open(){const got=claimPack(p.id);if(!got){close();return;}
+    $r("#dplater").hidden=true;$r("#dpodds").disabled=true;const tap=$r("#dptap");tap.textContent="";btn.setAttribute("aria-label","Dream Pack opened");
+    const res=got.res,order=res.map((x,i)=>i).sort((a,b)=>RAR_RANK[rarity(res[a].p.r)]-RAR_RANK[rarity(res[b].p.r)]||res[a].p.r-res[b].p.r);
+    const top=$r(".dp-top"),bot=$r(".dp-bot"),rip=$r(".dp-rip"),burst=$r("#dpburst");
+    pk.classList.remove("idle");
+    const cw=cardEls[0].offsetWidth,ch=cardEls[0].offsetHeight,ph=pk.offsetHeight,gap=Math.min(cw*1.1,(root.clientWidth-24)/3);
+    const fan=[[-gap,10,-6],[0,-6,0],[gap,10,6]];
+    if(REDUCED){top.style.opacity=0;bot.style.opacity=0;cardEls.forEach((c,i)=>{c.style.opacity=1;c.style.transform=`translate(-50%,-50%) translate(${fan[i][0]}px,${fan[i][1]}px) rotate(${fan[i][2]}deg)`;c.querySelector(".dpc-in").style.transform="rotateY(180deg)";});
+      reveal(res,true);return;}
+    /* shake, harder and harder */
+    for(let i=0;i<5;i++)setTimeout(sfx.rattle,i*90);buzz([10,30,10]);
+    await anim(pk,[{transform:"none"},{transform:"rotate(-3deg) translateX(-4px)"},{transform:"rotate(3deg) translateX(4px)"},{transform:"rotate(-4deg) translateX(-6px) scale(1.02)"},{transform:"rotate(5deg) translateX(6px) scale(1.03)"},{transform:"rotate(-6deg) translateX(-7px) scale(1.04)"},{transform:"scale(1.05)"}],{duration:560,easing:"ease-in-out"});
+    /* the rip runs across the tear line */
+    roar(.5,.07);tone(900,.18,"sawtooth",.025,0,180);
+    await anim(rip,[{transform:"scaleX(0)",opacity:1},{transform:"scaleX(1)",opacity:1}],{duration:260,easing:"cubic-bezier(.5,0,.2,1)"});
+    anim(rip,[{opacity:1},{opacity:0}],{duration:300});
+    anim(top,[{transform:"none",opacity:1},{transform:"translate(26%,-62%) rotate(26deg)",opacity:1,offset:.6},{transform:"translate(44%,-110%) rotate(38deg)",opacity:0}],{duration:760,easing:"cubic-bezier(.2,.7,.3,1)"});
+    anim(burst,[{transform:"translate(-50%,-50%) scale(.2)",opacity:0},{transform:"translate(-50%,-50%) scale(1)",opacity:1,offset:.35},{transform:"translate(-50%,-50%) scale(1.8)",opacity:0}],{duration:1100,easing:"ease-out"});
+    sfx.coin();buzz(25);await sleep(150);
+    /* three cards rise out of the pack */
+    const y0=ph*.18,yUp=-ph*.36;
+    cardEls.forEach((c,i)=>{setTimeout(sfx.deal,i*110);
+      anim(c,[{transform:`translate(-50%,-50%) translate(${(i-1)*cw*.08}px,${y0}px)`,opacity:1},{transform:`translate(-50%,-50%) translate(${(i-1)*cw*.14}px,${yUp-(i===1?14:0)}px) rotate(${(i-1)*4}deg)`,opacity:1}],{duration:620,delay:i*110,easing:"cubic-bezier(.2,.9,.3,1.05)"});});
+    await sleep(560);
+    anim(pk,[{transform:"scale(1.05)",opacity:1},{transform:`translateY(${ph*.55}px) scale(.92)`,opacity:0}],{duration:520,easing:"cubic-bezier(.5,0,.75,0)"});
+    await sleep(260);
+    /* fan out, then flip one at a time, best card last */
+    await Promise.all(cardEls.map((c,i)=>anim(c,[{transform:`translate(-50%,-50%) translate(${(i-1)*cw*.14}px,${yUp-(i===1?14:0)}px) rotate(${(i-1)*4}deg)`},{transform:`translate(-50%,-50%) translate(${fan[i][0]}px,${fan[i][1]}px) rotate(${fan[i][2]}deg)`}],{duration:520,delay:i*60,easing:"cubic-bezier(.2,.9,.3,1.12)"})));
+    btn.style.pointerEvents="none";root.querySelector(".dpo-cards").classList.add("dp-on");
+    tap.textContent="Tap to reveal faster";
+    const skip=()=>{fast=true;};$r("#dpstage").addEventListener("click",skip);
+    for(const i of order){const c=cardEls[i],r=rarity(res[i].p.r),inn=c.querySelector(".dpc-in");
+      if(!fast&&(r==="legend"||r==="elite")){c.classList.add("tease-"+r);sfx.tick();buzz(10);await sleep(r==="legend"?900:600);}
+      flipFX(c,r,fast);
+      await anim(inn,[{transform:"rotateY(0deg) scale(1)"},{transform:"rotateY(95deg) scale(1.12)",offset:.5},{transform:"rotateY(180deg) scale(1)"}],{duration:fast?260:620,easing:"cubic-bezier(.3,.7,.3,1)"});
+      c.classList.remove("tease-legend","tease-elite");c.classList.add("shown");
+      if(!fast)await sleep(r==="legend"?700:r==="elite"?420:220);}
+    $r("#dpstage").removeEventListener("click",skip);reveal(res,false);}
+  function flipFX(c,r,fast){
+    if(r==="legend"){sfx.legend();setTimeout(()=>{confetti(140,["#FFC93D","#FFE88A","#FFFFFF","#FF8A00"]);stampFly("LEGEND!");},fast?0:300);buzz([30,50,30]);}
+    else if(r==="elite"){setTimeout(()=>stampFly("ELITE!","elite"),fast?0:280);sfx.win();buzz(20);}
+    else if(r==="star"){sfx.pick();}else{sfx.deal();}}
+  function reveal(res,instant){state="done";const tap=$r("#dptap");tap.textContent="";
+    cardEls.forEach((c,i)=>{const x=res[i],t=c.querySelector(".dpc-tag");if(!x)return;t.hidden=false;t.className="dpc-tag "+(x.isNew?"new":"dup");t.textContent=x.isNew?"NEW":`DUPLICATE ×${x.n}`;
+      c.classList.add("shown");c.onclick=()=>cardModal(x.p);c.setAttribute("role","button");c.setAttribute("tabindex","0");c.setAttribute("aria-label",`${x.p.name}, ${RARITY_NAME[rarity(x.p.r)]}, rated ${x.p.r}`);});
+    const nNew=res.filter(x=>x.isNew).length,m=more(),foot=$r("#dpfoot");
+    foot.innerHTML=`<p class="dpo-added">${nNew?`<b>${nNew} new card${nNew>1?"s":""}</b> added to your Dream Team collection`:"All duplicates this time. They still count as extra copies."}</p>
+      ${packRedrawHTML(p)}<div class="dpo-act">${gbtn("COLLECTION","cyan","dpcol")}${m?gbtn(`NEXT PACK <span class="dpo-n">${m}</span>`,"gold","dpnext"):gbtn("CONTINUE","gold","dpdone")}</div>`;
+    foot.hidden=false;if(!instant)anim(foot,[{opacity:0,transform:"translateY(14px)"},{opacity:1,transform:"none"}],{duration:380,easing:"ease-out"});
+    $r("#dpcol").onclick=()=>{after=null;close();S.dreamTab="col";go("dream");};
+    const nx=$r("#dpnext");if(nx)nx.onclick=()=>{const a=after;after=null;close();setTimeout(()=>openPackFlow(null,a),60);};
+    const dn=$r("#dpdone");if(dn){dn.onclick=close;dn.focus();}packRedrawBind(p,res,root,()=>{const a=after;after=null;close();return a;});}
+}
+function cardModal(p){const n=dcol()[cardKey(p)]||0;
+  modal(`<div class="dt-big">${bigCardHTML(p,false)}</div><p class="dt-big-t"><b>${esc(p.name)}</b><br>${esc(TEAMS[p.team][0])} · ${FORMATS[p.fmt].name} ${p.year}<br>${ROLES[p.role].name} · ${RARITY_NAME[rarity(p.r)]}${n?` · You own ${n>1?n+" copies":"1 copy"}`:""}</p>${gbtn("CLOSE","cyan","","data-close")}`);}
+function openOdds(){modal(`<h3>Dream Pack odds</h3><p class="odds-p">Every pack holds 3 cards, all from the World Cup you just played. The further your team goes, the better the odds.</p>
+  <div class="odds-t" role="table" aria-label="Chance per card"><div class="ot-r h" role="row"><span role="columnheader">Finish</span><span role="columnheader" class="c-legend">Legend</span><span role="columnheader" class="c-elite">Elite</span><span role="columnheader" class="c-star">Star</span><span role="columnheader">Squad</span></div>
+   ${PACK_STEPS.map(f=>{const T=PACK_TIER[f];return `<div class="ot-r ${T.guar?"g":""}" role="row"><b role="cell">${T.name}</b>${T.odds.map(o=>`<span role="cell">${o}%</span>`).join("")}</div>${T.guar?`<div class="ot-r gx" role="row"><b role="cell">+ 1 guaranteed card</b><span role="cell">${T.guar[0]}%</span><span role="cell">${T.guar[1]}%</span><span role="cell">–</span><span role="cell">–</span></div>`:""}`;}).join("")}</div>
+  <p class="odds-f">Win the World Cup and one card is always an Elite or a Legend. At least one Legend in a pack: ${PACK_STEPS.map(f=>`${PACK_TIER[f].name.replace("-finalists"," finals").replace("Quarter finals","Quarters").replace("Semi finals","Semis")} <b>${oneIn(legendPerPack(f))}</b>`).join(" · ")}.</p>
+  <p class="odds-f">Every World Cup, the Daily and every duel earn one pack. Winning a duel lifts your pack one step. Legend 90+, Elite 84+, Star 76+.</p>${gbtn("GOT IT","cyan","","data-close")}`);}
+/* ---------- Dream Teams: one World Cup each (format + year), built only from cards won in packs ---------- */
+const DT_MAX=12;
+const edKey=p=>p.fmt+"-"+p.year;
+const edOK=(fmt,year)=>!!(FORMATS[fmt]&&FORMATS[fmt].ed[year]);
+function dteams(){const a=store.get("dteams",[]);if(!Array.isArray(a))return [];
+  return a.filter(t=>t&&t.id&&t.s&&typeof t.s==="object").map(t=>{if(edOK(t.fmt,t.year))return {...t,year:+t.year};
+    /* teams made before the one-World-Cup rule keep the World Cup most of their cards come from */
+    const cnt={};Object.values(t.s).forEach(k=>{const p=cardByKey(k);if(p)cnt[edKey(p)]=(cnt[edKey(p)]||0)+1;});
+    const best=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];if(!best)return null;const [fmt,y]=best.split("-"),s={};
+    Object.entries(t.s).forEach(([sid,k])=>{const p=cardByKey(k);if(p&&edKey(p)===best)s[sid]=k;});
+    return {...t,fmt,year:+y,s};}).filter(Boolean);}
+function dtSave(t){const a=dteams(),i=a.findIndex(x=>x.id===t.id),c={id:t.id,name:cleanName(t.name)||"Dream XI",fmt:t.fmt,year:+t.year,s:{...t.s}};if(i>=0)a[i]=c;else a.unshift(c);store.set("dteams",a.slice(0,DT_MAX));}
+function dtXI(s){return SLOTS.map(sl=>s[sl.id]&&cardByKey(s[sl.id])).filter(Boolean);}
+function dtPicks(s){const o={};SLOTS.forEach(sl=>{const p=s[sl.id]&&cardByKey(s[sl.id]);if(p)o[sl.id]=p;});return o;}
+function edTotal(fmt,year){return Object.keys(FORMATS[fmt].ed[year].teams).reduce((n,c)=>n+squad(fmt,year,c).length,0);}
+const edTag=(fmt,year,fmtOnly)=>`<span class="dt-ed ${fmt}">${FORMATS[fmt].short}${fmtOnly?"":" "+year}</span>`;
+const BIN=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`;
+IC.dream='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.3-7.5 10-4.3-1.7-7.5-5.4-7.5-10v-6z"/><path d="M12 7.6l1.4 2.9 3.2.4-2.3 2.2.6 3.2-2.9-1.6-2.9 1.6.6-3.2-2.3-2.2 3.2-.4z" fill="currentColor" stroke="none"/></svg>';
+
+function packBanner(q){const p=q[0];return `<button class="dt-pkban" data-dpopen="${p.id}" aria-label="Open your Dream Pack${q.length>1?"s":""}"><span class="dt-pkart">${packHTML(p,"mini")}${q.length>1?`<i class="dt-pkn">${q.length}</i>`:""}</span>
+  <span class="dt-pkt"><small>${q.length>1?`${q.length} DREAM PACKS WAITING`:"DREAM PACK WAITING"}</small><b>${esc(PACK_TIER[p.fin].pack.toUpperCase())}</b><em>${esc(packSrc(p))}</em></span><span class="dt-pkgo">OPEN</span></button>`;}
+
+/* a new Dream Team starts by choosing its World Cup */
+function newTeam(k){const [fmt,y]=k.split("-");if(!edOK(fmt,y))return;if(dteams().length>=DT_MAX){toast(`You can keep ${DT_MAX} Dream Teams. Delete one first.`);return;}
+  const n=dteams().filter(t=>t.fmt===fmt&&t.year===+y).length;
+  S.dtEdit={id:"t"+Date.now().toString(36),name:`${FORMATS[fmt].short} ${y} XI${n?" "+(n+1):""}`,fmt,year:+y,s:{},isNew:true};go("dtb");}
+function pickEdition(){const eds={};dcolList().forEach(x=>{const k=edKey(x.p),e=eds[k]=eds[k]||{n:0,L:0,roles:new Set()};e.n++;if(x.p.r>=90)e.L++;e.roles.add(x.p.role);});
+  const ks=Object.keys(eds).sort((a,b)=>eds[b].n-eds[a].n||b.split("-")[1]-a.split("-")[1]);
+  if(!ks.length){toast("Play any World Cup to win your first Dream Pack");return;}
+  const m=modal(`<h3>Pick a World Cup</h3><p class="odds-p">A Dream Team uses cards from one World Cup only, so every challenge is fair.</p>
+   <div class="ed-list">${ks.map(k=>{const [f,y]=k.split("-"),e=eds[k];return `<button class="ed-row" data-ed="${k}">${edTag(f,y,true)}<span class="ed-t"><b>World Cup ${y}</b><small>${e.n} card${e.n>1?"s":""} won${e.L?` · ${e.L} Legend${e.L>1?"s":""}`:""}${e.n<11?` · ${11-e.n} more to fill an XI`:""}</small></span><i aria-hidden="true">›</i></button>`;}).join("")}</div>
+   <button class="btn ghost" data-close>Cancel</button>`);
+  m.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{closeModal();newTeam(b.dataset.ed);});}
+
+function vDream(app){const list=dcolList(),q=packQ(),teams=dteams();let tab=S.dreamTab||(teams.length?"teams":"col"),role=S.dtRole||"all";
+  const draw=()=>{const cnt=t=>list.filter(x=>rarity(x.p.r)===t).length;let body="";
+    if(tab==="teams"){
+      if(teams.length){let at=Math.min(S.dtSlide||0,teams.length-1);
+        body=`<div class="dt-car" id="dtcar" tabindex="0" aria-label="Your Dream Teams, swipe for more">${teams.map((t,i)=>{const xi=dtXI(t.s),full=xi.length===11,r=full?rateXI(xi):null;
+          return `<article class="dt-slide" data-i="${i}" aria-label="${esc(t.name)}, ${FORMATS[t.fmt].name} ${t.year}">
+            <div class="dt-sl-h"><div class="dt-sl-t">${edTag(t.fmt,t.year)}<b>${esc(t.name)}</b></div>${full?`<span class="dt-ovr"><small>OVR</small>${Math.round(r.ovr)}</span>`:`<span class="dt-ovr part"><small>PICKED</small>${xi.length}/11</span>`}</div>
+            <div class="dt-prev">${groundPreview(dtPicks(t.s))}</div>
+            <div class="dt-sl-f"><span class="dt-bal2">${dtBalChips(t.s)}</span><button class="dt-del" data-del="${esc(t.id)}" aria-label="Delete ${esc(t.name)}">${BIN}</button><button class="dt-edit" data-edit="${esc(t.id)}">EDIT</button></div>${full?`<button class="dt-btgo" data-btgo="${esc(t.id)}">${DUEL_X}<span>BATTLE</span><small>Best of 5 · winner takes a card from the loser's XI</small></button>`:""}</article>`;}).join("")}</div>
+          ${teams.length>1?`<div class="dt-dots" id="dtdots">${teams.map((t,i)=>`<button class="${i===at?"on":""}" data-go="${i}" aria-label="Show ${esc(t.name)}"></button>`).join("")}</div>`:""}`;}
+      else body=`<div class="dt-empty"><div class="dt-empty-xi">${SLOTS.slice(0,5).map(sl=>`<span>${emptyMini(sl)}</span>`).join("")}</div><p><b>No Dream Teams yet.</b> Pick a World Cup, then fill all 11 spots with cards you've won from it. Make as many line-ups as you like.</p></div>`;
+      body+=teams.length<DT_MAX?gbtn(`＋ NEW DREAM TEAM`,"gold","dtnew"):`<p class="fine center">You have the maximum of ${DT_MAX} Dream Teams. Delete one to make another.</p>`;
+      body+=btHistoryHTML();
+      if(!list.length)body+=`<p class="fine center" style="margin-top:10px">Your collection is empty. Finish any World Cup, the Daily or a duel to win your first pack.</p>`;}
+    else{const roles=["all","O","M","W","A","S","F"],shown=list.filter(x=>role==="all"||x.p.role===role),own={},grp={};
+      list.forEach(x=>{own[edKey(x.p)]=(own[edKey(x.p)]||0)+1;});shown.forEach(x=>{(grp[edKey(x.p)]=grp[edKey(x.p)]||[]).push(x);});
+      const order=Object.keys(grp).sort((a,b)=>b.split("-")[1]-a.split("-")[1]||a.localeCompare(b));
+      body=`<div class="dt-sum">${TIERS4.map(t=>`<span class="dt-sm t-${t}"><b>${cnt(t)}</b>${RARITY_NAME[t]}</span>`).join("")}</div>
+        <div class="dt-chips" role="group" aria-label="Filter by role">${roles.map(r=>`<button class="dt-chip ${role===r?"on":""}" data-role="${r}" aria-pressed="${role===r}">${r==="all"?"ALL":ROLES[r].short}</button>`).join("")}</div>
+        ${order.length?order.map(k=>{const [f,y]=k.split("-"),xs=grp[k],tot=edTotal(f,y),L=xs.filter(x=>x.p.r>=90).length;
+          return `<section class="dt-ed-sec" aria-label="${FORMATS[f].name} ${y}"><div class="dt-ed-h">${edTag(f,y,true)}<span class="ed-t"><b>World Cup ${y}</b><small>${own[k]} of ${tot} collected${L?` · ${L} Legend${L>1?"s":""}`:""}</small></span><button class="dt-ed-b" data-build="${k}">BUILD XI</button></div>
+            <div class="dt-ed-bar"><i style="width:${Math.max(2,own[k]/tot*100)}%"></i></div>
+            <div class="dt-grid">${xs.map(x=>`<button class="dt-cell" data-k="${esc(x.k)}" aria-label="${esc(x.p.name)}, ${x.p.year}, rated ${x.p.r}${x.n>1?`, ${x.n} copies`:""}">${miniHTML(x.p)}${x.n>1?`<i class="dt-n">×${x.n}</i>`:""}</button>`).join("")}</div></section>`;}).join("")
+          :list.length?`<p class="fine center" style="margin:18px 0">No ${ROLES[role].name.toLowerCase()} cards yet.</p>`
+          :`<div class="dt-empty"><div class="dt-empty-pk">${packHTML({fin:"sf",fmt:"odi",year:2011},"mini ghost")}</div><p><b>No cards yet.</b> Finish any ODI or T20 World Cup, the Daily or a duel to win a Dream Pack of 3 cards from that World Cup. Go further for better odds.</p></div>`}
+        <button class="lb-more" id="dtodds">How Dream Pack odds work</button>`;}
+    app.innerHTML=`<div class="screen dream8">${topbar()}<h2 class="t6">DREAM <span>TEAM</span></h2><p class="s6">Every World Cup you play wins a pack of its cards. Build an XI for each World Cup.</p>
+      ${q.length?packBanner(q):""}${btInviteBanner()}
+      <div class="seg" role="tablist"><button role="tab" data-dt="teams" aria-selected="${tab==="teams"}">MY DREAM TEAMS</button><button role="tab" data-dt="col" aria-selected="${tab==="col"}">COLLECTION · ${list.length}</button></div>
+      <div class="dt-body">${body}</div></div>`;
+    app.querySelectorAll(".gprev").forEach(fitPrev);
+    const car=$("#dtcar");
+    if(car){const slideW=()=>{const s=car.querySelector(".dt-slide");return s?s.offsetWidth+12:1;},idx=()=>Math.round(car.scrollLeft/slideW());
+      car.scrollLeft=(S.dtSlide||0)*slideW();
+      car.addEventListener("scroll",()=>{const i=idx();S.dtSlide=i;app.querySelectorAll("#dtdots button").forEach((d,j)=>d.classList.toggle("on",j===i));},{passive:true});
+      app.querySelectorAll("#dtdots [data-go]").forEach(d=>d.onclick=()=>car.scrollTo({left:+d.dataset.go*slideW(),behavior:REDUCED?"auto":"smooth"}));}
+    app.querySelectorAll("[data-dt]").forEach(b=>b.onclick=()=>{tab=S.dreamTab=b.dataset.dt;draw();});
+    app.querySelectorAll("[data-role]").forEach(b=>b.onclick=()=>{role=S.dtRole=b.dataset.role;draw();});
+    app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{const p=cardByKey(b.dataset.k);if(p)cardModal(p);});
+    app.querySelectorAll("[data-build]").forEach(b=>b.onclick=()=>newTeam(b.dataset.build));
+    app.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{const t=dteams().find(x=>x.id===b.dataset.edit);if(t){S.dtEdit={id:t.id,name:t.name,fmt:t.fmt,year:t.year,s:{...t.s}};go("dtb");}});
+    app.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const t=dteams().find(x=>x.id===b.dataset.del);if(!t)return;
+      const m=modal(`<h3>Delete this team?</h3><p class="center">“${esc(t.name)}” will be deleted. The cards stay in your collection.</p><div class="actions two"><button class="btn ghost" data-close>Keep it</button><button class="btn pink" id="dtdelok">Delete</button></div>`);
+      $("#dtdelok",m).onclick=()=>{store.set("dteams",dteams().filter(x=>x.id!==t.id));S.dtSlide=Math.max(0,(S.dtSlide||0)-1);closeModal();toast("Dream Team deleted");draw();};});
+    const nw=$("#dtnew");if(nw)nw.onclick=pickEdition;
+    const od=$("#dtodds");if(od)od.onclick=openOdds;};
+  draw();}
+
+/* the builder: the same ground as the draft, every position picks from your cards of this World Cup */
+function dtField(s,pop){const picks=dtPicks(s);let h=groundField(picks,pop);
+  SLOTS.forEach(sl=>{const [x,y]=GPOS[sl.id],p=picks[sl.id];
+    h+=`<button class="dt-slot ${p?"":"empty"}" data-slot="${sl.id}" style="left:${x-35}px;top:${y-49.5}px" aria-label="${sl.role==="X"?"Flex":ROLES[sl.role].name}${p?": "+esc(p.name)+", tap to change":", empty, tap to pick"}"></button>`;});
+  return h;}
+function dtBalChips(s){const b=balanceOf(dtXI(s)),c=(ok,txt)=>`<span class="bc2 ${ok?"ok":""}">${txt}</span>`;
+  return c(b.wk>0,b.wk?"WK ✓":"NO WK")+c(b.bat>=BAL.needBat,`BAT ${b.bat}/${BAL.needBat}`)+c(b.bowl>=BAL.needBowl,`BOWL ${b.bowl}/${BAL.needBowl}`);}
+function vDreamBuild(app){const t=S.dtEdit;if(!t||!edOK(t.fmt,t.year)){S.screen="dream";return vDream(app);}
+  app.innerHTML=`<div class="gscreen dtb8"><div class="gstage" id="gstage"><div class="g-grass"></div><div id="gfield">${dtField(t.s)}</div><div class="g-topfade"></div>
+    <div class="g-head"><button class="gback" id="dtback" aria-label="Save and go back">${BACK}</button><span class="fmtchip"><b>${FORMATS[t.fmt].short} ${t.year}</b> · DREAM TEAM</span><span class="g-pick" id="dtcount"></span></div>
+    <div class="g-bal dt-bal" id="dtbal"></div>
+    <section class="g-dock dt-dock" aria-label="Your Dream Team">
+     <div class="dt-row"><label class="dt-name"><small>TEAM NAME</small><input id="dtname" maxlength="20" autocomplete="off" spellcheck="false" value="${esc(t.name)}"></label><span class="dt-ovr big" id="dtovr"></span></div>
+     <p class="dt-hint" id="dthint"></p>
+     <div class="dt-btns">${gbtn("AUTO-FILL","violet","dtauto")}${gbtn("SAVE TEAM","gold","dtsave")}</div></section></div></div>
+    <div class="scrim" id="scrim"></div><div class="sheet" id="sheet" role="dialog" aria-label="Choose a card"></div>`;
+  fitStage();
+  const own=dcolList().filter(x=>x.p.fmt===t.fmt&&x.p.year===t.year),edn=`${FORMATS[t.fmt].short} ${t.year}`;
+  const paint=pop=>{$("#gfield").innerHTML=dtField(t.s,pop);const xi=dtXI(t.s),n=xi.length;$("#dtcount").textContent=`${n}/11`;$("#dtbal").innerHTML=dtBalChips(t.s);
+    $("#dtovr").innerHTML=n===11?`<small>OVR</small><b>${Math.round(rateXI(xi).ovr)}</b>`:`<small>PICKED</small><b>${n}/11</b>`;
+    $("#dthint").textContent=!own.length?`No ${edn} cards yet. Play the ${edn} World Cup to win some.`:n<11?`Tap a position. You have ${own.length} ${edn} card${own.length>1?"s":""}.`:"XI complete. Tap any card to swap it.";
+    app.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>openSlot(b.dataset.slot));};
+  paint();
+  $("#dtname").oninput=e=>{t.name=e.target.value;};
+  const save=quiet=>{t.name=cleanName(t.name)||"Dream XI";dtSave(t);t.isNew=false;if(!quiet){sfx.coin();toast("Dream Team saved");}};
+  const home=()=>{const i=dteams().findIndex(x=>x.id===t.id);if(i>=0)S.dtSlide=i;S.dreamTab="teams";go("dream");};
+  $("#dtsave").onclick=()=>{save();home();};
+  $("#dtback").onclick=()=>{if(Object.keys(t.s).length||!t.isNew)save(true);home();};
+  $("#dtauto").onclick=()=>{const used=new Set(dtXI(t.s).map(p=>p.name));let added=0;
+    const take=sl=>{const c=own.find(x=>!used.has(x.p.name)&&!injOn(x.k)&&(sl.role==="X"||x.p.role===sl.role));if(c){t.s[sl.id]=c.k;used.add(c.p.name);added++;}};
+    SLOTS.filter(sl=>sl.role!=="X"&&!t.s[sl.id]).forEach(take);SLOTS.filter(sl=>sl.role==="X"&&!t.s[sl.id]).forEach(take);
+    if(added){sfx.land();paint();}else toast(own.length?"No more cards fit the empty spots":`Win ${edn} cards first`);};
+  function closeSheet(){$("#sheet").classList.remove("open");$("#scrim").classList.remove("on");}
+  $("#scrim").onclick=closeSheet;
+  function openSlot(id){const sl=SLOTS.find(x=>x.id===id);if(!sl)return;const role=sl.role,R=ROLES[role];
+    const pool=own.filter(x=>role==="X"||x.p.role===role);
+    const usedBy={};Object.entries(t.s).forEach(([sid,k])=>{const p=cardByKey(k);if(p&&sid!==id)usedBy[p.name]=sid;});
+    let ft="all";
+    const draw=()=>{const ts=[...new Set(pool.map(x=>x.p.team))].sort();if(!ts.includes(ft))ft="all";
+      const shown=pool.filter(x=>ft==="all"||x.p.team===ft),cur=t.s[id];
+      $("#sheet").innerHTML=`<div class="sheet-head6 dt-sh" style="--tc:${role==="X"?"#6D28D9":R.c}"><span class="sh-flag dt-rl">${R.short}</span><div class="sh-txt"><div class="sh-name">${role==="X"?"FLEX SPOT":esc(R.name.toUpperCase())}</div><div class="sh-sub">${pool.length?`${pool.length} ${edn} card${pool.length>1?"s":""}${role==="X"?" · any role":""}`:`No ${edn} ${role==="X"?"cards":esc(R.name.toLowerCase())+"s"} yet`}</div></div><button class="sh-x" id="shx" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        ${pool.length?`<div class="dt-filt"><span class="dt-fl">TEAM</span><div class="dt-chips sc" role="group" aria-label="Team"><button class="dt-chip ${ft==="all"?"on":""}" data-ft="all">ALL</button>${ts.map(c=>`<button class="dt-chip tm ${ft===c?"on":""}" data-ft="${c}"><span class="dt-cf">${flagSVG(c)}</span>${c}</button>`).join("")}</div></div>
+          <div class="sheet-body6 dt-sb">${shown.map((x,i)=>{const by=usedBy[x.p.name],hurt=injOn(x.k),off=!!by||!!hurt,here=cur===x.k;
+            return `<div class="cardcell6 ${here?"here":""} ${hurt?"hurt":""}">${cardHTML(x.p,{btn:true,i,off})}<span class="tc-why">${here?"<b>In this spot</b>":hurt?`<b class="injw">🩹 Injured · back in ${esc(injLeft(hurt))}</b>`:off?"Already in this XI":`${role==="X"?`<b>${ROLES[x.p.role].short}</b> · `:""}${esc(TEAMS[x.p.team][0])}${x.n>1?` · ×${x.n}`:""}`}</span></div>`;}).join("")}</div>`
+          :`<div class="dt-none"><p>You haven't won any ${edn} ${role==="X"?"cards":esc(R.name.toLowerCase())+"s"} yet.</p><p class="fine">Play the ${esc(FORMATS[t.fmt].name)} ${t.year} to win a Dream Pack of its cards.</p></div>`}
+        ${cur?`<button class="dt-rm" id="dtrm">Remove ${esc((cardByKey(cur)||{name:"card"}).name)} from this spot</button>`:""}`;
+      $("#shx").onclick=closeSheet;
+      $("#sheet").querySelectorAll("[data-ft]").forEach(b=>b.onclick=()=>{ft=b.dataset.ft;sfx.tick();draw();});
+      $("#sheet").querySelectorAll(".tc2:not(.off)").forEach(b=>b.onclick=()=>{const x=shown[+b.dataset.i];if(!x)return;t.s[id]=x.k;closeSheet();
+        const r=rarity(x.p.r);if(r==="legend"){sfx.legend();stampFly("LEGEND!");}else if(r==="elite")sfx.win();else sfx.pick();paint(id);});
+      const rm=$("#dtrm");if(rm)rm.onclick=()=>{delete t.s[id];closeSheet();sfx.tick();paint();};};
+    draw();$("#sheet").classList.add("open");$("#scrim").classList.add("on");const sb=$(".sheet-body6");if(sb)sb.scrollTop=0;}
+}
+
+/* ---------- home: the collection replaces "your best cards" ---------- */
+function homeCards(){const list=dcolList(),q=packQ(),top=list.slice(0,24),tm=dteams();
+  return `<section class="panel hp-sec dth"><div class="ph">DREAM TEAM COLLECTION<small>${list.length} card${list.length===1?"":"s"} won</small></div>
+   ${q.length?`<div class="dth-pk">${packBanner(q)}</div>`:""}
+   ${top.length?`<div class="hp-cards" tabindex="0" aria-label="Your best Dream Team cards, scroll for more">${top.map(x=>`<button class="hp-card" data-nav="dream" data-dtab="col" aria-label="${esc(x.p.name)} ${x.p.r}, ${FORMATS[x.p.fmt].short} ${x.p.year}, open your collection">${miniHTML(x.p)}<span class="hp-ed ${x.p.fmt}">${FORMATS[x.p.fmt].short} ${x.p.year}</span></button>`).join("")}</div>`
+     :`<div class="hp-empty"><div class="hp-backs"><i></i><i></i><i></i></div><p>Every game earns a Dream Pack with 3 cards. The further you go, the better the cards.</p></div>`}
+   <div class="dth-act"><button class="dth-b" data-nav="dream" data-dtab="teams">${IC.dream}<span><b>${tm.length?"MY DREAM TEAMS":"BUILD A DREAM TEAM"}</b><small>${tm.length?`${tm.length} line-up${tm.length>1?"s":""}`:"Pick from cards you've won"}</small></span></button>
+    <button class="dth-b" data-nav="dream" data-dtab="col">${IC.cards}<span><b>COLLECTION</b><small>${list.filter(x=>x.p.r>=90).length} Legend${list.filter(x=>x.p.r>=90).length===1?"":"s"}</small></span></button></div></section>`;}
+
+/* ---------- awarding packs: results screen ---------- */
+function resPackHTML(){const rp=S.resPack;if(!rp||rp.T!==S.T)return "";const p=packQ().find(x=>x.id===rp.id),T=PACK_TIER[rp.fin];
+  if(p)return `<section class="dp-res"><button class="dp-res-pk" data-dpopen="${p.id}" aria-label="Open your Dream Pack">${packHTML(p,"mini")}</button>
+    <div class="dp-res-t"><small>DREAM PACK EARNED</small><b>${esc(T.pack.toUpperCase())}</b><span>3 cards · ${packOddsLine(rp.fin)}</span>${gbtn("OPEN PACK","gold","",`data-dpopen="${p.id}"`)}</div></section>`;
+  const got=rp.cards.map(cardByKey).filter(Boolean);
+  return `<section class="dp-res done"><div class="dp-res-cards">${got.map(c=>`<button class="dp-res-c" data-k="${esc(cardKey(c))}" aria-label="${esc(c.name)}">${miniHTML(c)}</button>`).join("")}</div>
+    <div class="dp-res-t"><small>FROM YOUR DREAM PACK</small><b>IN YOUR COLLECTION</b><button class="r6-link" data-nav="dream" data-dtab="col">See the collection</button></div></section>`;}
+function paintResPack(){const el=$(".dp-res");if(el)el.outerHTML=resPackHTML();document.querySelectorAll(".dp-res-c[data-k]").forEach(b=>b.onclick=()=>{const p=cardByKey(b.dataset.k);if(p)cardModal(p);});}
+const _vResult8=vResult;
+vResult=function(app){const first=!S.scored;_vResult8(app);const T=S.T;if(!T)return;
+  if(first){const fin=outcomeKey(T),p=awardPack({fmt:T.fmt,year:T.year,fin,src:S.daily?"daily":T.fmt});S.resPack={T,id:p.id,fin,cards:p.cards};}
+  const anchor=app.querySelector(".r6-score")||app.querySelector(".res6");if(anchor&&!app.querySelector(".dp-res"))anchor.insertAdjacentHTML("afterend",resPackHTML());
+  paintResPack();
+  if(first&&S.resPack&&S.resPack.T===T){const id=S.resPack.id,run=S.runId;setTimeout(()=>{if(S.screen==="result"&&S.runId===run&&packQ().some(x=>x.id===id))openPackFlow(id,paintResPack);},outcomeKey(T)==="champ"?2800:1400);}};
+
+/* ---------- awarding packs: duels (your finish in the duel World Cup, one step up if you win) ---------- */
+function duelFinish(T,c){return T.champion===c?"champ":T.ko.final.some(m=>m.a===c||m.b===c)?"final":T.ko.sf.some(m=>m.a===c||m.b===c)?"sf":T.ko.qf.some(m=>m.a===c||m.b===c)?"qf":"group";}
+function paintDuelPack(pid){const end=$("#mtend");if(!end)return;let box=$("#dpduel");if(!box){end.querySelector(".dl-champ")?.insertAdjacentHTML("afterend",`<div id="dpduel"></div>`);box=$("#dpduel");}if(!box)return;
+  const p=packQ().find(x=>x.id===pid),r=Object.values(dRecs()).find(x=>x.pack===pid);
+  if(p){box.innerHTML=`<section class="dp-res"><button class="dp-res-pk" data-dpopen="${p.id}" aria-label="Open your Dream Pack">${packHTML(p,"mini")}</button><div class="dp-res-t"><small>DREAM PACK EARNED</small><b>${esc(PACK_TIER[p.fin].pack.toUpperCase())}</b><span>${p.won?"Duel win bonus · ":""}${packOddsLine(p.fin)}</span>${gbtn("OPEN PACK","gold","",`data-dpopen="${p.id}"`)}</div></section>`;return;}
+  const got=(r&&r.packCards||[]).map(cardByKey).filter(Boolean);
+  box.innerHTML=got.length?`<section class="dp-res done"><div class="dp-res-cards">${got.map(c=>`<div class="dp-res-c">${miniHTML(c)}</div>`).join("")}</div><div class="dp-res-t"><small>FROM YOUR DREAM PACK</small><b>IN YOUR COLLECTION</b><button class="r6-link" data-nav="dream" data-dtab="col">See the collection</button></div></section>`:"";}
+const _matchView8=matchView;
+matchView=function(app,V){const r0=dGet(V.id),first=!!(r0&&!r0.res&&r0.myTeam&&r0.oppTeam);duelMatchView(app,V);const r=dGet(V.id);if(!r||S.screen!=="duel")return;
+  if(first&&r.res&&S.T&&!r.pack){const me=r.role==="host"?"P1":"P2",step=Math.min(4,PACK_STEPS.indexOf(duelFinish(S.T,me))+(r.res==="W"?1:0));
+    const p=awardPack({fmt:r.fmt,year:r.year,fin:PACK_STEPS[step],src:"duel",won:r.res==="W"});dPut({id:r.id,pack:p.id,packCards:p.cards});}
+  const pid=(dGet(V.id)||{}).pack;if(!pid)return;clearInterval(S.dpIv);
+  S.dpIv=setInterval(()=>{const end=$("#mtend");if(S.screen!=="duel"||!end){clearInterval(S.dpIv);return;}if(end.hidden)return;clearInterval(S.dpIv);paintDuelPack(pid);
+    if(first)setTimeout(()=>{if(S.screen==="duel"&&$("#mtend")&&packQ().some(x=>x.id===pid))openPackFlow(pid,()=>paintDuelPack(pid));},1200);},250);};
+
+/* ---------- nav, routing and global taps ---------- */
+NAV7[1]=["dream","Dream Team","dream"];
+NAV_SCREENS.push("dream");
+ST_LABEL.dream="Building a Dream Team";ST_LABEL.dtb="Building a Dream Team";
+const _render8=render;
+render=function(){if(S.screen==="dream"||S.screen==="dtb"){duelBG(false);const app=$("#app");(S.screen==="dream"?vDream:vDreamBuild)(app);
+    const on=S.screen==="dream";document.body.classList.toggle("has-nav",on);let n=$("#navroot");if(!n){n=document.createElement("div");n.id="navroot";document.body.appendChild(n);}n.innerHTML=on?navHTML():"";livePub();return;}
+  _render8();};
+/* old "Cards" links go to the Dream Team screen */
+const _go8=go;
+go=function(screen){if(screen==="binder")screen="dream";_go8(screen);};
+document.addEventListener("click",e=>{const t=e.target.closest("[data-dtab]");if(t)S.dreamTab=t.dataset.dtab;},true);
+document.addEventListener("click",e=>{const b=e.target.closest("[data-dpopen]");if(!b)return;e.preventDefault();
+  const scr=S.screen,y=scrollY;openPackFlow(b.dataset.dpopen,()=>{if(S.screen!==scr)return;if(scr==="result")paintResPack();else if(scr==="duel"){const pid=b.dataset.dpopen;paintDuelPack(pid);}else{render();scrollTo(0,y);}});});
+
+/* ===================== v9: fair duel drafts, live split-screen room, animated match day ===================== */
+
+/* ---------- live picks: the guest shares every pick, in order, while drafting ---------- */
+function duelPickCodes(){const log=(S.duelLog||[]).slice(),cur=new Set();
+  SLOTS.forEach(sl=>{const p=S.picks[sl.id];if(!p)return;const c=sl.id+":"+p.team+"."+squad(S.fmt,S.year,p.team).findIndex(q=>q.name===p.name);cur.add(c);if(!log.includes(c))log.push(c);});
+  S.duelLog=log.filter(c=>cur.has(c));return S.duelLog;}
+function decodePicks(raw,fmt,year){const out=[],seen=new Set();if(!Array.isArray(raw)||!edOK(fmt,year))return out;
+  for(const c of raw.slice(0,11)){const m=/^([a-z]\d?):([A-Z]{2,4})\.(\d{1,2})$/.exec(String(c));if(!m)continue;
+    const [,sid,team,ix]=m;if(!SLOTS.some(s=>s.id===sid)||seen.has(sid)||!FORMATS[fmt].ed[year].teams[team])continue;
+    const p=squad(fmt,year,team)[+ix];if(!p)continue;seen.add(sid);out.push({sid,p});}
+  return out;}
+function duelProgress(){if(!S.duel)return;const r=dGet(S.duel.id);if(!r)return;const n=pickCount(),p=duelPickCodes();if(r.role!=="guest")return;
+  if(r.chan==="live")livePub({d:{id:r.id,st:"drafting",n,p}});
+  /* picks go in their own write, so an older server that doesn't know the field still gets the count */
+  if(r.chan==="inbox"){dbUpd(r.id,{n,st:"drafting",ts:Date.now()});dbUpd(r.id,{gp:p});}}
+const _startDuelDraft9=startDuelDraft;
+startDuelDraft=function(id){S.duelLog=[];_startDuelDraft9(id);};
+const _lockDuel9=lockDuel;
+lockDuel=function(){const id=S.duel&&S.duel.id,log=id?duelPickCodes().slice():[];_lockDuel9();const r=id&&dGet(id);if(!r)return;dPut({id,myOrder:log});
+  if(r.role==="guest"){if(r.chan==="live")livePub({d:{id,st:"locked",t:r.myTeam,p:log}});if(r.chan==="inbox")dbUpd(id,{gp:log});}};
+function oppPicks(r){let raw=null;
+  if(r.chan==="live"&&r.opp&&r.opp.peer){const pe=LIVE.peers.find(x=>x.peer===r.opp.peer),dd=pe&&pe.presence&&pe.presence.d;if(dd&&dd.id===r.id&&Array.isArray(dd.p))raw=dd.p;}
+  if(!raw&&r.chan==="inbox"){const ib=DB.mine.find(x=>x.id===r.id);if(ib&&Array.isArray(ib.gp))raw=ib.gp;}
+  if(raw&&raw.length&&JSON.stringify(raw)!==JSON.stringify(r.oppOrder||null))dPut({id:r.id,oppOrder:raw});
+  return decodePicks(raw||r.oppOrder,r.fmt,r.year);}
+
+/* ---------- the room: your XI v their XI, side by side, picks landing live ---------- */
+function slotTag(sid,p){const sl=SLOTS.find(s=>s.id===sid);return sl&&sl.role!=="X"?ROLES[sl.role].short:ROLES[p.role].short;}
+function dvRow(sid,p,cls=""){const flex=(SLOTS.find(s=>s.id===sid)||{}).role==="X";
+  return `<li class="dv-r t-${rarity(p.r)} ${cls}"><span class="dv-pos ${flex?"dv-fx":""}" style="--rc:${ROLES[p.role].c}">${slotTag(sid,p)}</span><b class="dv-ov">${p.r}</b><span class="dv-nm">${esc(shortN(p.name))}</span><span class="dv-tf">${flagSVG(p.team)}</span></li>`;}
+function dvEmpty(i,now,txt){return `<li class="dv-r empty ${now?"now":""}"><span class="dv-pos">${i+1}</span><span class="dv-nm">${now?txt||"Picking…":"—"}</span></li>`;}
+function dvSplitHTML(r){const st=oppState(r),me=r.me||{name:S.team&&S.team.name,f:myTeam()&&packFlag(myTeam().flag)},meFlag=unpackFlag(me.f)||GREY_FLAG,o=r.opp||{},oFlag=unpackFlag(o.f);
+  const mine=safeTeam(r.myTeam,r.fmt,r.year),mineRows=mine?SLOTS.map((sl,i)=>({sid:sl.id,p:mine.xi[i]})):[];
+  let oppRows=[],oppDone=false;
+  if(st.k==="locked"&&r.oppTeam){const t=safeTeam(r.oppTeam,r.fmt,r.year),ord=decodePicks(r.oppOrder,r.fmt,r.year);oppDone=!!t;
+    oppRows=ord.length===11?ord:t?SLOTS.map((sl,i)=>({sid:sl.id,p:t.xi[i]})):[];}
+  else if(st.k==="drafting")oppRows=oppPicks(r);
+  const seen=(S.dvSeen=S.dvSeen||{})[r.id]||0,fresh=oppRows.length>seen&&st.k==="drafting";S.dvSeen[r.id]=oppRows.length;
+  if(fresh&&seen>0){sfx.deal();buzz(8);}
+  const waitTxt={pick:"Pick a rival below",invited:"Waiting to accept",inbox:"In their inbox",sending:"Sending…",code:"Waiting for their code",declined:"Declined",offline:"Went offline"}[st.k];
+  const oppList=oppRows.map((x,i)=>dvRow(x.sid,x.p,i>=seen&&st.k==="drafting"?"new":"")).join("")+Array.from({length:11-oppRows.length},(_,j)=>dvEmpty(oppRows.length+j,j===0,st.k==="drafting"?"Picking…":waitTxt)).join("");
+  const ovr=xs=>xs.length===11?`<small>OVR</small><b>${Math.round(rateXI(xs).ovr)}</b>`:xs.length?`<small>AVG</small><b>${Math.round(xs.reduce((a,p)=>a+p.r,0)/xs.length)}</b>`:`<small>OVR</small><b>–</b>`;
+  const oTag={pick:"NO RIVAL YET",invited:"INVITED",inbox:"IN THEIR INBOX",sending:"SENDING…",drafting:`DRAFTING · ${oppRows.length||st.n||0}/11`,locked:"LOCKED IN ✓",declined:"DECLINED",offline:"OFFLINE",code:"CODE SHARED"}[st.k]||"";
+  const oName=o.name||(st.k==="pick"?"Your rival":"Opponent");
+  return `<div class="dv-split ${st.k}" data-k="${esc(st.k+oppRows.length)}">
+   <div class="dv-col me"><div class="dv-hd"><span class="dv-fl">${flagSVG({isUser:true,flag:meFlag})}</span><b>${esc(me.name||"You")}</b><small class="ok">LOCKED IN ✓</small></div>
+    <ol class="dv-list">${mineRows.map(x=>dvRow(x.sid,x.p)).join("")}</ol><div class="dv-ft">${ovr(mineRows.map(x=>x.p))}</div></div>
+   <div class="dv-mid" aria-hidden="true"><i class="dv-line"></i><span class="dv-vs">VS</span></div>
+   <div class="dv-col opp ${st.k}"><div class="dv-hd"><span class="dv-fl">${oFlag&&["drafting","locked"].includes(st.k)?flagSVG({isUser:true,flag:oFlag}):`<i class="dv-q">?</i>`}</span><b>${esc(oName)}</b><small class="${st.k==="locked"?"ok":st.k==="drafting"?"live":st.k==="declined"||st.k==="offline"?"bad":""}">${oTag}</small></div>
+    <ol class="dv-list">${oppList}</ol><div class="dv-ft">${ovr(oppRows.map(x=>x.p))}</div></div></div>`;}
+function dvPaint(){const box=$("#rmbody"),V=S.duelView;if(!box||!V)return;const r=dGet(V.id);if(!r||!r.myTeam)return;
+  const old=box.querySelector(".rm-vs")||box.querySelector(".dv-split");if(!old)return;
+  const st=oppState(r),k=st.k+(st.k==="drafting"?oppPicks(r).length:"")+(r.opp&&r.opp.name||"");
+  if(old.classList.contains("dv-split")&&old.dataset.full===k)return;
+  old.outerHTML=dvSplitHTML(r);const n=box.querySelector(".dv-split");if(n)n.dataset.full=k;
+  const bar=box.querySelector(".rm-wait");if(bar&&st.k==="drafting")bar.querySelector(".rm-bar i").style.width=Math.round(oppPicks(r).length/11*100)+"%";}
+const _roomRefresh9=roomRefresh;
+roomRefresh=function(force){_roomRefresh9(force);dvPaint();};
+
+/* ---------- match day: one round at a time, versus, result, points ---------- */
+function mdTeam(T,c){const t=T.teams[c];return t;}
+function mdFlag(t){return flagSVG(t.isUser?{isUser:true,flag:t.flag}:t.code);}
+function mdInn(res,c){return res.first.team===c?res.first:res.second;}
+function mdScore(i){return `${i.runs}${i.wkts>=10?"":"/"+i.wkts}`;}
+function duelMatchView(app,V){const r=dGet(V.id);if(!r||!r.myTeam||!r.oppTeam){S.duelView={v:"room",id:V.id};return roomView(app,S.duelView);}
+  const hostRaw=r.role==="host"?r.myTeam:r.oppTeam,guestRaw=r.role==="host"?r.oppTeam:r.myTeam;
+  const host=safeTeam(hostRaw,r.fmt,r.year),guest=safeTeam(guestRaw,r.fmt,r.year);if(!host||!guest){toast("This duel's teams are unreadable");S.duelView={v:"hub"};return hubView(app);}
+  const R=runDuel({id:r.id,seed:r.seed,fmt:r.fmt,year:r.year,host,guest});S.T=R.T;const T=R.T;
+  const meC=r.role==="host"?"P1":"P2",won=R.winner===meC,first=!r.res;
+  if(first){dPut({id:r.id,res:won?"W":"L"});const x0=store.get("xp",0),g=won?300:100;store.set("xp",x0+g);levelUp(x0,x0+g);
+    if(r.role==="guest"&&r.chan==="live")livePub({d:null,acc:null});if(r.role==="host")livePub({inv:null,d:null});}
+  const tm={P1:R.A,P2:R.B},champ=teamOf(R.T.champion),fin={P1:R.f1,P2:R.f2};
+  /* the rounds: team strength, each group match, then the knockouts either of you reached */
+  const g1=R.p1.filter(m=>m.stage==="G"),g2=R.p2.filter(m=>m.stage==="G"),nG=Math.max(g1.length,g2.length),rounds=[];
+  for(let i=0;i<nG;i++)rounds.push({k:"G",lab:`MATCH ${i+1}`,short:`G${i+1}`,a:g1[i],b:g2[i],n:i+1});
+  const KO={QF:"QUARTER-FINAL",SF:"SEMI-FINAL",F:"FINAL"};
+  for(const s of ["QF","SF","F"]){const a=R.p1.find(m=>m.stage===s),b=R.p2.find(m=>m.stage===s);if(a||b)rounds.push({k:s,lab:KO[s],short:s==="F"?"FINAL":s,a,b,ko:true});}
+  rounds.forEach(x=>x.h2h=!!(x.a&&x.a.opp==="P2"));
+  const pts=m=>m&&m.won?DPTS[m.stage]:0;
+  app.innerHTML=`<div class="screen duel7 md9">${topbar()}
+   <div class="mt-score" id="mtscore"><div class="mt-s ${meC==="P1"?"me":""}" data-s="P1"><span class="mt-top"><span class="mt-f">${flagSVG({isUser:true,flag:R.A.flag})}</span><span class="mt-v" id="sP1">0</span></span><b class="mt-n">${esc(R.A.name)}</b></div>
+    <span class="mt-vs">VS</span><div class="mt-s ${meC==="P2"?"me":""}" data-s="P2"><span class="mt-top"><span class="mt-v" id="sP2">0</span><span class="mt-f">${flagSVG({isUser:true,flag:R.B.flag})}</span></span><b class="mt-n">${esc(R.B.name)}</b></div></div>
+   <p class="eyb">${FORMATS[r.fmt].short} WORLD CUP ${r.year} · LIVE DUEL</p>
+   <div class="md-steps" id="mdsteps" aria-hidden="true"><i class="xi" data-s="xi">XI</i>${rounds.map((x,i)=>`<i class="${x.ko?"ko":""}" data-s="${i}">${x.short}</i>`).join("")}</div>
+   <div class="md-stage" id="mdstage" aria-live="polite"></div>
+   <div class="md-logh" id="mdlogh" hidden>RESULTS<small>Tap a match for the scorecard</small></div>
+   <div class="md-log" id="mdlog"></div>
+   <div id="mtend" hidden>
+    <div class="dl-ban ${won?"w":"l"} show"><b>${won?"YOU WIN THE DUEL!":`${esc(tm[R.winner].name.toUpperCase())} WINS THE DUEL`}</b>
+     <small>${R.reason==="score"?`${R.s1.toLocaleString("en-IN")} to ${R.s2.toLocaleString("en-IN")}. ${esc(tm.P1.name)} finished: ${FIN_SHORT[R.f1]}. ${esc(tm.P2.name)} finished: ${FIN_SHORT[R.f2]}.`:`Level on ${R.s1}. ${esc(tm[R.winner].name)} won the head-to-head.`}</small>${first?`<span class="dl-xp">+${won?300:100} XP</span>`:""}</div>
+    <p class="dl-champ">World Cup winners: <b>${esc(champ.name)}</b>${R.T.champion===meC?" · that's you!":""}</p>
+    <div class="actions">${r.chan==="code"&&r.role==="guest"?gbtn("SEND THE RESULT BACK","green","mtsend"):""}${gbtn(`${DUEL_X}REMATCH`,"gold","mtre")}<button class="r6-link" id="mtsc">Head-to-head scorecards</button><button class="r6-link" id="mthub">All duels</button></div>
+    <div id="mth2h" hidden>${R.h2h.map((h,i)=>`<div class="panel"><div class="ph">${i===0?"HEAD-TO-HEAD · GROUP":"HEAD-TO-HEAD · KNOCKOUT"}</div>${boardCard(h,true)}</div>`).join("")}</div></div>
+   <button class="mt-skip" id="mtskip">Skip to the result ⏭</button></div>`;
+  /* scoreboard */
+  const tot={P1:0,P2:0};
+  const target=(k,v)=>{const e=$("#s"+k);if(!e)return;const from=+e.textContent.replace(/\D/g,"")||0,t0=performance.now();
+    const f=t=>{const q=Math.min(1,(t-t0)/650);e.textContent=Math.round(from+(v-from)*(1-Math.pow(1-q,3))).toLocaleString("en-IN");if(q<1)requestAnimationFrame(f);};requestAnimationFrame(f);
+    const box=e.closest(".mt-s");if(box&&v>from){box.classList.remove("bump");void box.offsetWidth;box.classList.add("bump");}};
+  const lead=()=>app.querySelectorAll(".mt-s").forEach(s=>s.classList.toggle("lead",tot[s.dataset.s]>tot[s.dataset.s==="P1"?"P2":"P1"]));
+  const add=(k,v)=>{tot[k]+=v;target(k,tot[k]);lead();};
+  /* pieces */
+  const lane=(m,who,side)=>{const t=tm[who];
+    if(!m)return `<div class="md-lane ${side} out"><span class="md-me">${flagSVG({isUser:true,flag:t.flag})}<b>${esc(t.name)}</b></span><span class="md-gone">OUT · ${FIN_SHORT[fin[who]]==="Groups"?"in the groups":esc(FIN_SHORT[fin[who]].toLowerCase())}</span></div>`;
+    const o=mdTeam(T,m.opp),mi=mdInn(m.res,who),oi=mdInn(m.res,m.opp);
+    return `<div class="md-lane ${side} ${m.won?"is-w":"is-l"}"><div class="md-row"><span class="md-me">${flagSVG({isUser:true,flag:t.flag})}<b>${esc(t.name)}</b></span><span class="md-v">v</span><span class="md-op"><b>${esc(o.isUser||o.name.length<=11?o.name:o.code)}</b>${mdFlag(o)}</span></div>
+      <div class="md-bar"><i></i></div><span class="md-live"><i></i>LIVE</span>
+      <div class="md-res"><span class="md-sc">${mdScore(mi)}</span><span class="md-st">${m.won?"WON":"LOST"}<small>${esc(m.res.summary.replace("won by ","by "))}</small></span><span class="md-sc o">${mdScore(oi)}</span></div>
+      <span class="md-pts">${m.won?"+"+DPTS[m.stage]:"+0"}</span></div>`;};
+  const h2hHTML=x=>{const m=x.a,w=m.won?"P1":"P2",i1=mdInn(m.res,"P1"),i2=mdInn(m.res,"P2");
+    return `<div class="md-h2h ${w==="P1"?"wl":"wr"}"><div class="md-hs l"><span class="md-hf">${flagSVG({isUser:true,flag:R.A.flag})}</span><b>${esc(R.A.name)}</b><em>${mdScore(i1)}</em></div>
+      <span class="md-hvs">VS</span><div class="md-hs r"><span class="md-hf">${flagSVG({isUser:true,flag:R.B.flag})}</span><b>${esc(R.B.name)}</b><em>${mdScore(i2)}</em></div>
+      <div class="md-bar"><i></i></div><span class="md-live"><i></i>LIVE</span><div class="md-hw"><b>${w===meC?"YOU WIN":esc(tm[w].name.toUpperCase())+" WINS"}</b><small>${esc(m.res.summary)} · +${DPTS[m.stage]}</small></div></div>`;};
+  const cardHTMLr=(x,i)=>`<div class="md-card k-${x.k} ${x.h2h?"h2h":""}"><div class="md-ban"><small>${x.ko?"KNOCKOUT":"GROUP STAGE"}</small><b>${x.h2h?"HEAD TO HEAD":x.lab}</b>${x.ko?"":`<em>${x.n} of ${nG}</em>`}</div>
+    ${x.h2h?h2hHTML(x):lane(x.a,"P1","l")+lane(x.b,"P2","r")}</div>`;
+  const half=(m,who)=>!m?`<span class="md-h x">OUT</span>`:`<span class="md-h ${m.won?"w":"l"}"><i>${m.won?"W":"L"}</i><small>v ${esc(mdTeam(T,m.opp).isUser?(m.opp===meC?"you":"rival"):m.opp)}</small>${m.won?`<em>+${DPTS[m.stage]}</em>`:""}</span>`;
+  const logRow=(x,i)=>`<button class="md-lr k-${x.k} ${x.h2h?"h2h":""}" data-r="${i}"><span class="md-lk">${x.short}</span>${x.h2h?`<span class="md-h h2"><i>${DUEL_X}</i><small>${esc(tm[x.a.won?"P1":"P2"].name)} won the head-to-head</small><em>+${DPTS[x.a.stage]}</em></span>`:half(x.a,"P1")+half(x.b,"P2")}</button>`;
+  const step=(s,cls)=>{const el=app.querySelector(`#mdsteps [data-s="${s}"]`);if(!el)return;app.querySelectorAll("#mdsteps i.now").forEach(e=>e.classList.remove("now"));if(cls)el.classList.add(...cls.split(" "));
+    el.scrollIntoView({block:"nearest",inline:"center",behavior:REDUCED?"auto":"smooth"});};
+  const logIt=(x,i)=>{const lg=$("#mdlog");if(!lg)return;$("#mdlogh").hidden=false;lg.insertAdjacentHTML("afterbegin",logRow(x,i));const el=lg.firstElementChild;el.classList.add("in");
+    el.onclick=()=>{const m=x.h2h?x.a:(meC==="P1"?x.a:x.b)||x.a||x.b;if(m)modal(`${boardCard(m.res,true)}<div class="actions"><button class="btn ghost" data-close>Close</button></div>`);};
+    const st=app.querySelector(`#mdsteps [data-s="${i}"]`);if(st){st.classList.remove("now");st.classList.add("done");st.style.setProperty("--a",x.a?(x.a.won?"#22C55E":"#E11D48"):"#475569");st.style.setProperty("--b",x.b?(x.b.won?"#22C55E":"#E11D48"):"#475569");}};
+  /* the show */
+  const tok=S.mdTok=(S.mdTok||0)+1,alive=()=>S.mdTok===tok&&S.screen==="duel"&&!!$("#mdstage");
+  let fast=false,done=false;
+  const pause=ms=>new Promise(res=>{if(done)return res();setTimeout(res,fast?ms*.4:ms);});
+  const stage=$("#mdstage");
+  stage.onclick=()=>{fast=true;};
+  async function intro(){step("xi","now");
+    stage.innerHTML=`<div class="md-card k-xi"><div class="md-ban"><small>MATCH DAY</small><b>TEAM STRENGTH</b></div>
+      <div class="md-xi"><div class="md-xs"><span class="md-hf">${flagSVG({isUser:true,flag:R.A.flag})}</span><b>${esc(R.A.name)}</b><em>OVR ${Math.round(R.A.ovr)}</em><span class="md-pts">+${R.base1}</span></div>
+       <span class="md-hvs">VS</span><div class="md-xs"><span class="md-hf">${flagSVG({isUser:true,flag:R.B.flag})}</span><b>${esc(R.B.name)}</b><em>OVR ${Math.round(R.B.ovr)}</em><span class="md-pts">+${R.base2}</span></div></div></div>`;
+    stage.firstElementChild.classList.add("in");sfx.land();await pause(700);if(!alive())return false;
+    stage.firstElementChild.classList.add("done");add("P1",R.base1);add("P2",R.base2);sfx.coin();await pause(900);
+    const s=app.querySelector('#mdsteps [data-s="xi"]');if(s){s.classList.remove("now");s.classList.add("done","xi-d");}return alive();}
+  async function play(x,i){step(i,"now");
+    if(x.ko){stage.innerHTML=`<div class="md-splash k-${x.k}"><small>KNOCKOUT</small><b>${x.lab}</b></div>`;sfx.fifty();await pause(x.k==="F"?850:620);if(!alive())return false;}
+    stage.innerHTML=cardHTMLr(x,i);const c=stage.firstElementChild;
+    c.classList.add("in");x.h2h?roar(.6,.06):sfx.tick();await pause(420);if(!alive())return false;
+    c.classList.add("play");for(let k=0;k<4;k++)setTimeout(()=>alive()&&!done&&sfx.rattle(),k*130);await pause(x.ko?800:640);if(!alive())return false;
+    c.classList.add("done");const pa=pts(x.a),pb=x.h2h?0:pts(x.b);
+    if(x.h2h){const w=x.a.won?"P1":"P2";add(w,DPTS[x.a.stage]);w===meC?(sfx.win(),buzz(25)):sfx.lose();}
+    else{if(pa)add("P1",pa);if(pb)add("P2",pb);const mine=meC==="P1"?x.a:x.b;mine&&mine.won?sfx.coin():sfx.tick();}
+    if(x.k==="F"&&((x.a&&x.a.won)||(x.b&&x.b.won)))confetti(70);
+    await pause(x.ko?900:620);if(!alive())return false;logIt(x,i);c.classList.add("out");await pause(180);return alive();}
+  function finish(){if(done)return;done=true;S.mdTok++;
+    const lg=$("#mdlog");if(!lg)return;stage.innerHTML="";
+    const shown=new Set([...lg.querySelectorAll("[data-r]")].map(e=>+e.dataset.r));rounds.forEach((x,i)=>{if(!shown.has(i))logIt(x,i);});
+    const xs=app.querySelector('#mdsteps [data-s="xi"]');if(xs)xs.classList.add("done","xi-d");
+    tot.P1=R.s1;tot.P2=R.s2;target("P1",R.s1);target("P2",R.s2);lead();
+    $("#mtskip").hidden=true;$("#mtend").hidden=false;
+    app.querySelectorAll(".mt-s").forEach(s=>s.classList.toggle("win",s.dataset.s===R.winner));
+    stage.innerHTML=`<div class="md-card k-end ${won?"w":"l"} in done"><div class="md-ban"><small>FULL TIME</small><b>${won?"YOU WIN!":"YOU LOSE"}</b></div><div class="md-fin"><span>${R.s1.toLocaleString("en-IN")}</span><i>–</i><span>${R.s2.toLocaleString("en-IN")}</span></div></div>`;
+    if(first){won?(sfx.legend(),confetti(180),roar(1,.12)):sfx.lose();}
+    const b=$("#mtsend");if(b)b.onclick=()=>shareCode(duelMsg(encodeDuel({i:r.id,f:r.fmt,y:r.year,s:r.seed,h:hostRaw,g:guestRaw}),"result",r.fmt,r.year,R.A.name,R.B.name));
+    $("#mtre").onclick=()=>{S.duelFmt=r.fmt;S.duelView={v:"create"};render();};$("#mthub").onclick=()=>{S.duelView={v:"hub"};render();};
+    $("#mtsc").onclick=()=>{const h=$("#mth2h");h.hidden=!h.hidden;};}
+  $("#mtskip").onclick=finish;
+  if(!first||REDUCED){finish();}
+  else (async()=>{if(!await intro())return;for(let i=0;i<rounds.length;i++){if(!await play(rounds[i],i))return;}if(alive()||S.screen==="duel")finish();})();
+  refreshHUD();}
+
+/* ===================== v10: installable app (home-screen install, shortcuts) ===================== */
+const PWA={evt:null,installed:false};
+const isStandalone=()=>{try{return matchMedia("(display-mode: standalone)").matches||matchMedia("(display-mode: fullscreen)").matches||navigator.standalone===true;}catch(e){return false;}};
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const INSTALL_LATER="dtw_install_later"; /* not a dt_ key, so it stays on this device */
+function installSnoozed(){try{return +localStorage.getItem(INSTALL_LATER)>Date.now();}catch(e){return false;}}
+function canOfferInstall(){return !isStandalone()&&!PWA.installed&&!installSnoozed()&&(!!PWA.evt||isIOS());}
+const IC_INSTALL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M12 7v7M9 11.5l3 3 3-3M10 18.5h4"/></svg>';
+const IC_SHARE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"/></svg>';
+const IC_ADD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+function installCard(){if(!canOfferInstall())return "";
+  return `<section class="pwa-card" id="pwacard" aria-label="Install Dream Team"><div class="pwa-in"><span class="pwa-ic"><img src="/icons/icon-192.png" alt="" width="46" height="46"></span>
+   <span class="pwa-t"><b>INSTALL DREAM TEAM</b><small>Full screen from your home screen. Plays offline too.</small></span>
+   <button class="pwa-go" id="pwago">${IC_INSTALL}INSTALL</button><button class="pwa-x" id="pwax" aria-label="Not now">✕</button></div></section>`;}
+function paintInstall(){if(S.screen!=="home")return;const html=installCard(),c=$("#pwacard");
+  if(c){if(!html)c.remove();else c.outerHTML=html;}else if(html){const a=$(".streak7");if(a)a.insertAdjacentHTML("afterend",html);}
+  const g=$("#pwago");if(g)g.onclick=doInstall;
+  const x=$("#pwax");if(x)x.onclick=()=>{try{localStorage.setItem(INSTALL_LATER,String(Date.now()+7*864e5));}catch(e){}const el=$("#pwacard");if(el)el.remove();};}
+async function doInstall(){
+  if(PWA.evt){const e=PWA.evt;PWA.evt=null;try{e.prompt();const r=await e.userChoice;if(r&&r.outcome==="accepted"){PWA.installed=true;sfx.coin();}}catch(err){}paintInstall();return;}
+  if(isIOS()){modal(`<div class="pwa-m-ic"><img src="/icons/icon-192.png" alt="" width="72" height="72"></div><h3>Add to Home Screen</h3>
+    <ol class="pwa-steps"><li><i>${IC_SHARE}</i><span>Tap the <b>Share</b> button in Safari's toolbar.</span></li><li><i>${IC_ADD}</i><span>Scroll down and tap <b>Add to Home Screen</b>.</span></li><li><i>✓</i><span>Tap <b>Add</b>. Dream Team opens full screen from your home screen.</span></li></ol>
+    ${gbtn("GOT IT","cyan","","data-close")}`);return;}
+  toast("Use your browser menu: Install app or Add to Home Screen");}
+addEventListener("beforeinstallprompt",e=>{e.preventDefault();PWA.evt=e;paintInstall();});
+addEventListener("appinstalled",()=>{PWA.evt=null;PWA.installed=true;paintInstall();toast("Installed. Open Dream Team from your home screen");});
+const _vHome10b=vHome;
+vHome=function(app){_vHome10b(app);paintInstall();};
+/* home-screen shortcuts: /?go=daily | dream | duel */
+function pwaLaunch(){let dest=null;try{dest=new URLSearchParams(location.search).get("go");}catch(e){}if(!dest)return;
+  try{history.replaceState(null,"",location.pathname+location.hash);}catch(e){}
+  if(!myTeam())return;
+  setTimeout(()=>{if(dest==="dream"){S.dreamTab="teams";go("dream");}
+    else if(dest==="duel"){S.duelView={v:"hub"};go("duel");}
+    else if(dest==="daily"){if(dailyDone())go("home");else startRun(null,true);}},80);}
+const _boot10=boot;
+boot=function(){_boot10();pwaLaunch();};
+
+/* ===================== v11: Dream Team Battles (best of 5, winner takes a card) ===================== */
+/* Challenge an online player with one of your complete Dream Teams. They answer with their own Dream Team
+   from the same World Cup, so it's fair. Both phones play the same seeded best-of-5 at the same time.
+   The winner picks one card from the loser's XI, and that card moves from the loser's collection to theirs.
+   Messages ride on live presence: bt (invite / accept / decline), bp (winner's pending picks), ba (loser's receipts). */
+const BT_WIN=3,BT_XP={W:200,L:80};
+const poss=n=>/s$/i.test(n)?n+"'":n+"'s";
+const btRecs=()=>{const a=store.get("battles",{});return a&&typeof a==="object"?a:{};};
+const btGet=id=>btRecs()[id]||null;
+function btPut(r){const a=btRecs();a[r.id]={...(a[r.id]||{}),...r,ts:Date.now()};const ks=Object.keys(a).sort((x,y)=>a[y].ts-a[x].ts);ks.slice(30).forEach(k=>delete a[k]);store.set("battles",a);return a[r.id];}
+function btRecord(){const v=Object.values(btRecs());return {w:v.filter(r=>r.res==="W").length,l:v.filter(r=>r.res==="L").length};}
+function btOwned(t){const c=dcol();return SLOTS.every(sl=>t.s[sl.id]&&c[t.s[sl.id]]>0);}
+function btPack(t){const picks=dtPicks(t.s);if(Object.keys(picks).length!==11)return null;const me=myTeam();return packTeam({name:t.name,flag:me?me.flag:GREY_FLAG},picks,t.fmt,t.year);}
+const btReady=t=>dtXI(t.s).length===11&&btOwned(t);
+ST_LABEL.battle="In a Dream Team battle";
+
+/* presence now also carries battle messages */
+function livePub(patch){if(patch)for(const k in patch){if(patch[k]==null)delete LIVE.extra[k];else LIVE.extra[k]=patch[k];}
+  if(!LIVE.room)return;const t=myTeam();
+  LIVE.room.presence({v:1,n:t?cleanName(t.name):"",f:t?packFlag(t.flag):null,lv:levelOf(store.get("xp",0)).n,st:S.screen,
+    inv:LIVE.extra.inv||null,acc:LIVE.extra.acc||null,d:LIVE.extra.d||null,bt:LIVE.extra.bt||null,bp:LIVE.extra.bp||null,ba:LIVE.extra.ba||null}).catch(()=>{});}
+function btSyncPub(){const v=Object.values(btRecs());
+  const bp=v.filter(r=>r.res==="W"&&r.pick&&!r.acked).slice(0,6).map(r=>({i:r.id,s:r.pick}));
+  const ba=v.filter(r=>r.res==="L"&&r.applied).sort((a,b)=>b.ts-a.ts).slice(0,8).map(r=>r.id);
+  livePub({bp:bp.length?bp:null,ba:ba.length?ba:null});}
+
+/* ---------- the series: same seed, same result on both phones ---------- */
+function runBattle(r,host,guest){setSeed(hashStr("bt|"+r.id+"|"+r.seed));const F=FORMATS[r.fmt];
+  const mk=(code,t)=>{const x=makeTeam(code,t.name,t.flag.c[0],t.xi,true);x.flag=t.flag;if(t.cap!=null)capApply(x,t.cap);return x;};
+  const A=mk("P1",host),B=mk("P2",guest),games=[],score={P1:0,P2:0};
+  while(score.P1<BT_WIN&&score.P2<BT_WIN){const g=simMatch(A,B,F);games.push(g);score[g.winner]++;}
+  setSeed(null);return {A,B,F,games,score,winner:score.P1>score.P2?"P1":"P2",xi:{P1:host.xi,P2:guest.xi}};}
+
+/* ---------- card transfer ---------- */
+function btClaim(id,slot){const r=btGet(id);if(!r||r.res!=="W"||r.pick)return null;const t=safeTeam(r.oppTeam,r.fmt,r.year),i=SLOTS.findIndex(s=>s.id===slot),p=t&&t.xi[i];if(!p)return null;
+  const k=cardKey(p),c=dcol(),isNew=!c[k];c[k]=(c[k]||0)+1;store.set("dcol",c);btPut({id,pick:slot,won:k,wonNew:isNew?1:0});btSyncPub();return {p,isNew,n:c[k]};}
+function btApplyLoss(id,slot){const r=btGet(id);if(!r||r.res!=="L"||r.applied)return;const t=safeTeam(r.myTeam,r.fmt,r.year),i=SLOTS.findIndex(s=>s.id===slot),p=t&&t.xi[i];if(!p)return;
+  const k=cardKey(p),c=dcol(),had=c[k]||0;if(had>1)c[k]=had-1;else delete c[k];store.set("dcol",c);
+  if(!c[k]){const a=store.get("dteams",[]);if(Array.isArray(a)){a.forEach(tm=>{if(tm&&tm.s)for(const sid in tm.s)if(tm.s[sid]===k)delete tm.s[sid];});store.set("dteams",a);}}
+  btPut({id,applied:1,pick:slot,lost:k,left:c[k]||0});btSyncPub();
+  if(S.screen==="battle"&&S.btView&&S.btView.id===id)btLoserSteal(slot);
+  else toast(`⚔ ${(r.opp&&r.opp.name)||"Your rival"} took ${p.name} from your Dream Team`);}
+
+/* ---------- live messages ---------- */
+function battleTick(){if(!LIVE.room)return;const me=LIVE.me;let changed=false;
+  for(const p of LIVE.peers){if(p.isMe||!p.presence)continue;const pr=p.presence,b=pr.bt;
+    if(b&&typeof b==="object"&&b.to===me){const id=cleanId(b.id),r=id&&btGet(id);
+      if(id&&b.k==="inv"&&!r&&!(S.btSeen&&S.btSeen[id])&&okWC(b.f,b.y)&&Number.isInteger(b.s)){const ht=safeTeam(b.t,b.f,+b.y);
+        if(ht){(S.btSeen=S.btSeen||{})[id]=1;S.btInv={id,fmt:b.f,year:+b.y,seed:b.s>>>0,host:ht,player:cleanName(pr.n)||ht.name,peer:p.peer,uid:p.by};battleBar(S.btInv);if(S.screen==="dream")render();}}
+      if(r&&b.k==="acc"&&r.role==="host"&&r.st==="invited"){const gt=safeTeam(b.t,r.fmt,r.year);
+        if(gt){btPut({id,oppTeam:gt.raw,oppDt:gt.name,opp:{...r.opp,uid:p.by},st:"ready"});livePub({bt:null});closeModal();openBattle(id);}}
+      if(r&&b.k==="no"&&r.role==="host"&&r.st==="invited"){btPut({id,st:"declined"});livePub({bt:null});closeModal();toast(`${cleanName(pr.n)||"They"} declined the battle`);}}
+    /* a winner's pick that takes one of my cards */
+    if(Array.isArray(pr.bp))for(const x of pr.bp.slice(0,6)){const id=cleanId(x&&x.i),r=id&&btGet(id);
+      if(!r||r.res!=="L"||r.applied||(r.opp&&r.opp.uid&&r.opp.uid!==p.by)||!SLOTS.some(s=>s.id===x.s))continue;btApplyLoss(id,x.s);changed=true;}
+    /* the loser's receipt: stop sending that pick */
+    if(Array.isArray(pr.ba))for(const idr of pr.ba.slice(0,8)){const id=cleanId(idr),r=id&&btGet(id);if(r&&r.res==="W"&&r.pick&&!r.acked){btPut({id,acked:1});changed=true;if(S.screen==="battle"&&S.btView&&S.btView.id===id)btPaintPrizeStatus();}}}
+  /* an invite that went away (host cancelled or left) */
+  if(S.btInv&&!LIVE.peers.some(p=>p.peer===S.btInv.peer&&p.presence&&p.presence.bt&&p.presence.bt.id===S.btInv.id&&p.presence.bt.k==="inv")){const el=$("#btbar");if(el)el.classList.remove("on");S.btInv=null;if(S.screen==="dream")render();}
+  /* my accept was read once the host stops inviting */
+  const mine=LIVE.extra.bt;if(mine&&mine.k==="acc"&&!LIVE.peers.some(p=>p.peer===mine.to&&p.presence&&p.presence.bt&&p.presence.bt.id===mine.id))livePub({bt:null});
+  if(changed)btSyncPub();}
+const _duelTick11=duelTick;
+duelTick=function(){_duelTick11();try{battleTick();}catch(e){}};
+if(typeof document!=="undefined"&&document.getElementById&&document.getElementById("app"))setTimeout(()=>{if(LIVE.room)btSyncPub();},1500);
+
+/* ---------- challenge, accept, decline ---------- */
+function btPickRival(teamId){const t=dteams().find(x=>x.id===teamId);if(!t)return;
+  if(!btReady(t)){toast(dtXI(t.s).length<11?"Fill all 11 spots first":"One of these cards isn't in your collection any more");return;}
+  const on=onlinePlayers(),ovr=Math.round(rateXI(dtXI(t.s)).ovr);
+  const m=modal(`<h3>Dream Team Battle</h3><div class="bt-mh">${edTag(t.fmt,t.year)}<b>${esc(t.name)}</b><span>OVR ${ovr}</span></div>
+   <p class="odds-p">Best of 5 against their ${FORMATS[t.fmt].short} ${t.year} Dream Team.<br><b class="bt-stk">Winner takes one card from the loser's XI.</b></p>
+   <div class="bt-rivals">${on.length?on.map(p=>`<div class="ib-row"><span class="dl-fl">${flagSVG({isUser:true,flag:p.flag})}</span><span class="dl-t"><b>${esc(p.name)}</b><small><i class="dot"></i>${esc(ST_LABEL[p.st]||"Online")} · LV ${p.lv}</small></span><button class="ib-y" data-btp="${esc(p.peer)}">CHALLENGE</button></div>`).join("")
+     :`<p class="lb-note">${LIVE.room?"Nobody else has the game open right now. Ask a friend to open it, then try again.":"Connecting to the battle server…"}</p>`}</div>
+   <p class="fine center">They need a complete ${FORMATS[t.fmt].short} ${t.year} Dream Team to accept.</p><button class="btn ghost" data-close>Cancel</button>`);
+  m.querySelectorAll("[data-btp]").forEach(b=>b.onclick=()=>btChallenge(teamId,b.dataset.btp));}
+function btChallenge(teamId,peer){const t=dteams().find(x=>x.id===teamId),p=onlinePlayers().find(x=>x.peer===peer);if(!t||!p)return;const pk=btPack(t);if(!pk)return;
+  const id=Math.random().toString(36).slice(2,10),seed=Math.floor(Math.random()*4294967295);
+  btPut({id,role:"host",fmt:t.fmt,year:t.year,seed,myTeam:pk,myDt:t.id,opp:{name:p.name,f:packFlag(p.flag),peer:p.peer,uid:p.uid},st:"invited"});
+  livePub({bt:{k:"inv",id,to:p.peer,f:t.fmt,y:t.year,s:seed,t:pk}});sfx.pick();
+  const m=modal(`<div class="bt-wait"><span class="bt-wf">${flagSVG({isUser:true,flag:p.flag})}</span><h3>Challenge sent</h3><p class="odds-p">Waiting for <b>${esc(p.name)}</b> to pick their ${FORMATS[t.fmt].short} ${t.year} Dream Team…</p><div class="rm-bar"><i style="width:100%"></i></div></div>
+   <button class="btn ghost" id="btcancel">Cancel the challenge</button>`);
+  $("#btcancel",m).onclick=()=>{livePub({bt:null});btPut({id,st:"cancelled"});closeModal();};
+  setTimeout(()=>{const r=btGet(id);if(r&&r.st==="invited"){livePub({bt:null});btPut({id,st:"expired"});if($("#btcancel"))closeModal();toast(`${p.name} didn't answer. Try again later.`);}},60000);}
+function battleBar(inv){let el=$("#btbar");if(!el){el=document.createElement("div");el.id="btbar";document.body.appendChild(el);}
+  el.innerHTML=`<div class="ivb bt-ivb" role="alert"><span class="ivb-f">${flagSVG({isUser:true,flag:inv.host.flag})}</span><div class="ivb-t"><b>${esc(inv.player)}</b><small>⚔ Dream Team Battle · ${FORMATS[inv.fmt].short} ${inv.year} · winner takes a card</small></div>
+   <button class="ivb-y" id="bty">VIEW</button><button class="ivb-n" id="btx" aria-label="Decline">✕</button></div>`;
+  el.classList.add("on");sfx.legend();buzz([30,60,30]);
+  $("#bty").onclick=()=>{el.classList.remove("on");btAcceptView();};$("#btx").onclick=()=>{el.classList.remove("on");btDecline();};
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("on"),45000);}
+function btAcceptView(){const bar=$("#btbar");if(bar)bar.classList.remove("on");const inv=S.btInv;if(!inv){toast("That challenge has expired");return;}
+  const mine=dteams().filter(t=>t.fmt===inv.fmt&&t.year===inv.year),ready=mine.filter(btReady),edn=`${FORMATS[inv.fmt].short} ${inv.year}`;
+  const m=modal(`<h3>Battle challenge</h3><div class="bt-mh"><span class="bt-mf">${flagSVG({isUser:true,flag:inv.host.flag})}</span><b>${esc(inv.player)}</b><span>${esc(inv.host.name)} · OVR ${Math.round(rateXI(inv.host.xi).ovr)}</span></div>
+   <p class="odds-p">${esc(FORMATS[inv.fmt].name)} ${inv.year} · best of 5.<br><b class="bt-stk">Winner takes one card from the loser's XI.</b></p>
+   ${ready.length?`<span class="dt-fl">PICK YOUR ${edn} DREAM TEAM</span><div class="ed-list">${ready.map(t=>`<button class="ed-row" data-bta="${esc(t.id)}">${edTag(t.fmt,t.year)}<span class="ed-t"><b>${esc(t.name)}</b><small>OVR ${Math.round(rateXI(dtXI(t.s)).ovr)} · ${dtXI(t.s).filter(p=>p.r>=90).length} Legend</small></span><i aria-hidden="true">›</i></button>`).join("")}</div>`
+     :`<div class="dt-none"><p>You need a complete <b>${edn}</b> Dream Team to accept${mine.length?". Yours isn't full yet":""}.</p></div>${gbtn(mine.length?"FINISH MY TEAM":"BUILD ONE","gold","btbuild")}`}
+   <div class="actions two"><button class="btn ghost" id="btno">Decline</button><button class="btn ghost" data-close>Later</button></div>`);
+  m.querySelectorAll("[data-bta]").forEach(b=>b.onclick=()=>btAccept(b.dataset.bta));
+  const bb=$("#btbuild",m);if(bb)bb.onclick=()=>{closeModal();const t=mine[0];if(t){S.dtEdit={id:t.id,name:t.name,fmt:t.fmt,year:t.year,s:{...t.s}};go("dtb");}else newTeam(inv.fmt+"-"+inv.year);};
+  $("#btno",m).onclick=()=>{closeModal();btDecline();};}
+function btAccept(teamId){const inv=S.btInv,t=dteams().find(x=>x.id===teamId);if(!inv||!t){toast("That challenge has expired");closeModal();return;}const pk=btPack(t);if(!pk)return;
+  btPut({id:inv.id,role:"guest",fmt:inv.fmt,year:inv.year,seed:inv.seed,myTeam:pk,myDt:t.id,oppTeam:inv.host.raw,oppDt:inv.host.name,opp:{name:inv.player,f:packFlag(inv.host.flag),peer:inv.peer,uid:inv.uid},st:"ready"});
+  livePub({bt:{k:"acc",id:inv.id,to:inv.peer,t:pk}});S.btInv=null;closeModal();openBattle(inv.id);}
+function btDecline(){const inv=S.btInv;if(!inv)return;livePub({bt:{k:"no",id:inv.id,to:inv.peer}});S.btInv=null;setTimeout(()=>{if(LIVE.extra.bt&&LIVE.extra.bt.k==="no")livePub({bt:null});},8000);if(S.screen==="dream")render();}
+function openBattle(id){S.btView={id};go("battle");}
+
+/* ---------- the battle screen: vertical timeline, then the prize ---------- */
+function vBattle(app){const V=S.btView||{},r=V.id&&btGet(V.id);if(!r||!r.myTeam||!r.oppTeam){setTimeout(()=>go("dream"));return;}
+  const hostRaw=r.role==="host"?r.myTeam:r.oppTeam,guestRaw=r.role==="host"?r.oppTeam:r.myTeam;
+  const host=safeTeam(hostRaw,r.fmt,r.year),guest=safeTeam(guestRaw,r.fmt,r.year);if(!host||!guest){toast("This battle's teams are unreadable");go("dream");return;}
+  const B=runBattle(r,host,guest),meC=r.role==="host"?"P1":"P2",opC=meC==="P1"?"P2":"P1",won=B.winner===meC,first=!r.res;
+  if(first){btPut({id:r.id,res:won?"W":"L",st:"done",score:`${B.score[meC]}-${B.score[opC]}`});const x0=store.get("xp",0),g=BT_XP[won?"W":"L"];store.set("xp",x0+g);levelUp(x0,x0+g);}
+  S.T={teams:{P1:B.A,P2:B.B},F:B.F,fmt:r.fmt,year:r.year};S.btB=B;
+  const me=myTeam(),player={[meC]:(me&&me.name)||"You",[opC]:(r.opp&&r.opp.name)||"Rival"};
+  const side=(c,cls)=>`<div class="bt-side ${cls} ${c===meC?"me":""}" data-s="${c}"><span class="bt-fl">${flagSVG({isUser:true,flag:B[c==="P1"?"A":"B"].flag})}</span><b>${esc(B[c==="P1"?"A":"B"].name)}</b><small>${esc(player[c])}${c===meC?" · YOU":""}</small><em>OVR ${Math.round(B[c==="P1"?"A":"B"].ovr)}</em></div>`;
+  const inn=(g,c)=>g.first.team===c?g.first:g.second,sc=i=>`${i.runs}${i.wkts>=10?"":"/"+i.wkts}`;
+  const rows=B.games.map((g,i)=>{const a=inn(g,"P1"),b=inn(g,"P2"),w=g.winner;
+    return `<div class="bt-row" data-i="${i}"><div class="bt-c l ${w==="P1"?"w":"x"}"><b data-to="${a.runs}" data-sc="${sc(a)}">${sc(a)}</b><small>${oversStr(a.balls)} ov${g.first.team==="P1"?" · batted first":""}</small><i class="bt-win">WIN</i></div>
+      <div class="bt-node"><span>M${i+1}</span></div>
+      <div class="bt-c r ${w==="P2"?"w":"x"}"><b data-to="${b.runs}" data-sc="${sc(b)}">${sc(b)}</b><small>${oversStr(b.balls)} ov${g.first.team==="P2"?" · batted first":""}</small><i class="bt-win">WIN</i></div>
+      <p class="bt-line"><b>${esc(B[w==="P1"?"A":"B"].name)}</b> ${esc(g.summary)}${g.potm&&g.potm.name?` · ⭐ ${esc(g.potm.name)}${g.potm.line?" "+esc(g.potm.line):""}`:""}</p></div>`;}).join("");
+  app.innerHTML=`<div class="screen duel7 bt11">${topbar()}<div class="tm-top"><button class="gback" id="btback" aria-label="Back to Dream Team">${BACK}</button></div>
+   <div class="bt-hd">${side("P1","l")}<div class="bt-score"><span><b id="bsP1">0</b><i>–</i><b id="bsP2">0</b></span><small>BEST OF 5</small></div>${side("P2","r")}</div>
+   <p class="eyb">${FORMATS[r.fmt].short} WORLD CUP ${r.year} · DREAM TEAM BATTLE</p>
+   <div class="bt-stake">${DUEL_X}<span>Winner takes one card from the loser's XI</span></div>
+   <div class="bt-tl" id="bttl">${rows}</div>
+   <div id="btend" hidden><div class="dl-ban ${won?"w":"l"} show"><b>${won?"YOU WIN THE SERIES!":`${esc(B[B.winner==="P1"?"A":"B"].name.toUpperCase())} WINS`}</b><small>${B.score[B.winner]}–${B.score[B.winner==="P1"?"P2":"P1"]} in the series${first?` · +${BT_XP[won?"W":"L"]} XP`:""}</small></div>
+    <div id="btprize"></div><div class="actions"><button class="r6-link" id="btsc">Scorecards</button><button class="r6-link" id="btdt">Dream Team</button></div><div id="btscs" hidden></div></div>
+   <button class="mt-skip" id="btskip">Skip to the result ⏭</button></div>`;
+  $("#btback").onclick=()=>{S.dreamTab="teams";go("dream");};
+  const tok=S.btTok=(S.btTok||0)+1,alive=()=>S.btTok===tok&&S.screen==="battle"&&!!$("#bttl");let fast=false,done=false;
+  const pause=ms=>new Promise(res=>{if(done)return res();setTimeout(res,fast?ms*.35:ms);});
+  const tot={P1:0,P2:0},bump=c=>{const e=$("#bs"+c);if(!e)return;e.textContent=tot[c];e.classList.remove("bump");void e.offsetWidth;e.classList.add("bump");
+    app.querySelectorAll(".bt-side").forEach(s=>s.classList.toggle("lead",tot[s.dataset.s]>tot[s.dataset.s==="P1"?"P2":"P1"]));};
+  const count=(el,to)=>{const t0=performance.now(),d=fast?200:650,fin=el.dataset.sc;const f=t=>{const q=Math.min(1,(t-t0)/d);el.textContent=q<1?Math.round(to*(1-Math.pow(1-q,3))):fin;if(q<1&&!done)requestAnimationFrame(f);else el.textContent=fin;};requestAnimationFrame(f);};
+  const showRow=(el,i,instant)=>{el.classList.add("in","play","done");const g=B.games[i];tot[g.winner]++;bump(g.winner);if(instant)return;};
+  $("#bttl").onclick=()=>{fast=true;};
+  function finish(){if(done)return;done=true;S.btTok++;const els=[...app.querySelectorAll(".bt-row")];
+    els.forEach((el,i)=>{if(!el.classList.contains("done")){el.classList.add("in","play","done");el.querySelectorAll("[data-sc]").forEach(b=>b.textContent=b.dataset.sc);}});
+    tot.P1=B.score.P1;tot.P2=B.score.P2;bump("P1");bump("P2");
+    app.querySelectorAll(".bt-side").forEach(s=>s.classList.toggle("win",s.dataset.s===B.winner));
+    $("#btskip").hidden=true;$("#btend").hidden=false;const late=S.btLate;S.btLate=null;btPaintPrize(true,!!late);if(late)setTimeout(()=>btLoserSteal(late),1700);
+    setTimeout(()=>{const e=$("#btend");if(e&&S.screen==="battle")e.scrollIntoView({block:"start",behavior:REDUCED||!first?"auto":"smooth"});},first?900:0);
+    if(first&&!REDUCED){won?(sfx.legend(),confetti(160),roar(1,.1)):sfx.lose();}
+    $("#btsc").onclick=()=>{const s=$("#btscs");if(!s.innerHTML)s.innerHTML=B.games.map((g,i)=>`<div class="panel"><div class="ph">MATCH ${i+1}</div>${boardCard(g,true)}</div>`).join("");s.hidden=!s.hidden;};
+    $("#btdt").onclick=()=>{S.dreamTab="teams";go("dream");};}
+  $("#btskip").onclick=finish;
+  if(!first||REDUCED){finish();return;}
+  (async()=>{await pause(500);if(!alive())return;
+    const els=[...app.querySelectorAll(".bt-row")];
+    for(let i=0;i<els.length;i++){const el=els[i],g=B.games[i];
+      el.classList.add("in");sfx.tick();el.scrollIntoView({block:"nearest",behavior:REDUCED?"auto":"smooth"});await pause(420);if(!alive())return;
+      el.classList.add("play");el.querySelectorAll("[data-to]").forEach(b=>count(b,+b.dataset.to));for(let k=0;k<4;k++)setTimeout(()=>alive()&&sfx.rattle(),k*140);await pause(760);if(!alive())return;
+      el.classList.add("done");tot[g.winner]++;bump(g.winner);g.winner===meC?sfx.coin():sfx.tick();
+      if(tot[g.winner]===BT_WIN-1&&tot[g.winner==="P1"?"P2":"P1"]<BT_WIN-1&&i<els.length-1){el.insertAdjacentHTML("beforeend",`<span class="bt-mp">MATCH POINT</span>`);}
+      await pause(700);if(!alive())return;}
+    finish();})();
+  refreshHUD();}
+
+/* the prize: the winner picks, the loser watches the card leave */
+function btPaintPrize(entering,forceWait){const box=$("#btprize"),r=S.btView&&btGet(S.btView.id),B=S.btB;if(!box||!r||!B)return;
+  const meC=r.role==="host"?"P1":"P2",opC=meC==="P1"?"P2":"P1",oppName=(r.opp&&r.opp.name)||"Your rival",won=r.res==="W";
+  const grid=(xi,cls,pickSid)=>`<div class="bt-grid ${cls}">${xi.map((p,i)=>{const sid=SLOTS[i].id,taken=pickSid===sid;return `<button class="bt-card ${taken?"taken":""}" data-sl="${sid}" ${cls==="pick"?"":"tabindex=\"-1\""} aria-label="${esc(p.name)}, rated ${p.r}">${miniHTML(p)}${taken?`<i class="bt-tag">${won?"YOURS":"STOLEN"}</i>`:""}</button>`;}).join("")}</div>`;
+  if(won&&!r.pick){box.innerHTML=`<section class="bt-prize win ${entering?"in":""}"><div class="bt-ph"><b>CLAIM YOUR PRIZE</b><small>Take one card from ${esc(poss(oppName))} XI. It moves into your collection.</small></div>${grid(B.xi[opC],"pick")}</section>`;
+    box.querySelectorAll("[data-sl]").forEach(b=>b.onclick=()=>btConfirm(b.dataset.sl));return;}
+  if(won){const p=cardByKey(r.won);box.innerHTML=`<section class="bt-prize win done"><div class="bt-ph"><b>YOUR PRIZE</b><small id="btst">${r.acked?`Delivered. ${esc(oppName)} has handed it over.`:`Yours now. ${esc(oppName)}'s game removes it next time you're both online.`}</small></div>
+      <div class="bt-won">${p?bigCardHTML(p,!!r.wonNew):""}</div>${grid(B.xi[opC],"",r.pick)}</section>`;return;}
+  if(!r.applied||forceWait){box.innerHTML=`<section class="bt-prize lose ${entering?"in":""}"><div class="bt-ph"><b>YOUR XI IS ON THE LINE</b><small><i class="dot"></i>${esc(oppName)} is choosing one of your cards…</small></div>${grid(B.xi[meC],"wait")}</section>`;return;}
+  const p=cardByKey(r.lost);box.innerHTML=`<section class="bt-prize lose done"><div class="bt-ph"><b>${esc(oppName.toUpperCase())} TOOK A CARD</b><small>${p?`${esc(p.name)} left your collection${r.left?` · you still have ${r.left}`:" and your Dream Team"}.`:""}</small></div>${grid(B.xi[meC],"",r.pick)}</section>`;}
+function btPaintPrizeStatus(){const s=$("#btst"),r=S.btView&&btGet(S.btView.id);if(s&&r&&r.acked)s.textContent=`Delivered. ${(r.opp&&r.opp.name)||"Your rival"} has handed it over.`;}
+function btConfirm(sid){const r=S.btView&&btGet(S.btView.id),B=S.btB;if(!r||!B||r.pick)return;const opC=r.role==="host"?"P2":"P1",i=SLOTS.findIndex(s=>s.id===sid),p=B.xi[opC][i];if(!p)return;
+  const n=dcol()[cardKey(p)]||0;
+  const m=modal(`<div class="dt-big">${bigCardHTML(p,!n)}</div><p class="dt-big-t"><b>Take ${esc(p.name)}?</b><br>${esc(TEAMS[p.team][0])} · ${RARITY_NAME[rarity(p.r)]} · rated ${p.r}${n?`<br>You already own ${n>1?n+" copies":"1 copy"}.`:""}</p>
+   ${gbtn("TAKE THIS CARD","gold","bttake")}<button class="btn ghost" data-close>Pick another</button>`);
+  $("#bttake",m).onclick=()=>{closeModal();const res=btClaim(r.id,sid);if(res)btWinnerSteal(sid,res);};}
+/* shared-element flight: the card lifts out of their XI and lands on your side */
+function btFly(el,toEl,o){if(!el||!toEl||!el.animate)return Promise.resolve();const a=el.getBoundingClientRect(),b=toEl.getBoundingClientRect(),c=el.cloneNode(true);
+  c.className="bt-flyer "+(o.cls||"");c.style.cssText=`left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px`;document.body.appendChild(c);
+  const dx=b.left+b.width/2-(a.left+a.width/2),dy=b.top+b.height/2-(a.top+a.height/2),lift=Math.min(-60,dy/2-80);
+  return c.animate([{transform:"translate(0,0) scale(1) rotate(0)",opacity:1},{transform:`translate(${dx*.35}px,${lift}px) scale(1.35) rotate(${o.spin||-8}deg)`,opacity:1,offset:.38},{transform:`translate(${dx}px,${dy}px) scale(.35) rotate(${(o.spin||-8)*2}deg)`,opacity:o.fade?0:.9}],{duration:REDUCED?10:o.ms||1100,easing:"cubic-bezier(.45,.05,.25,1)",fill:"forwards"}).finished.catch(()=>{}).then(()=>c.remove());}
+async function btWinnerSteal(sid,res){const r=S.btView&&btGet(S.btView.id);if(!r)return;const meC=r.role==="host"?"P1":"P2";
+  const card=document.querySelector(`.bt-grid.pick [data-sl="${sid}"]`),target=document.querySelector(`.bt-side[data-s="${meC}"] .bt-fl`);
+  document.querySelectorAll(".bt-grid.pick .bt-card").forEach(b=>{b.disabled=true;if(b!==card)b.classList.add("dim");});
+  if(card){card.classList.add("lift");sfx.pick();buzz(15);await sleep(REDUCED?0:260);card.classList.add("gone");}
+  await btFly(card,target,{cls:"gold",spin:-10});
+  if(target){const s=target.closest(".bt-side");s.classList.remove("got");void s.offsetWidth;s.classList.add("got");}
+  rarity(res.p.r)==="legend"?(sfx.legend(),stampFly("LEGEND!")):sfx.win();confetti(110,["#FFC93D","#FFE88A","#FFFFFF","#22C55E"]);
+  btPaintPrize();const p=$("#btprize");if(p)p.scrollIntoView({block:"start",behavior:REDUCED?"auto":"smooth"});
+  toast(`${res.p.name} joins your collection${res.n>1?` · ×${res.n}`:""}`);}
+async function btLoserSteal(sid){const r=S.btView&&btGet(S.btView.id);if(!r)return;const opC=r.role==="host"?"P2":"P1";
+  const card=document.querySelector(`.bt-grid.wait [data-sl="${sid}"]`),target=document.querySelector(`.bt-side[data-s="${opC}"] .bt-fl`);
+  if(!card){const e=$("#btend");if(e&&e.hidden){S.btLate=sid;return;}btPaintPrize();return;}
+  card.classList.add("seized");sfx.wicket();buzz([40,40,40]);await sleep(REDUCED?0:900);
+  card.classList.add("gone");await btFly(card,target,{cls:"red",spin:12,fade:true,ms:1000});
+  if(target){const s=target.closest(".bt-side");s.classList.remove("got");void s.offsetWidth;s.classList.add("got");}
+  sfx.lose();btPaintPrize();const p=$("#btprize");if(p)p.scrollIntoView({block:"start",behavior:REDUCED?"auto":"smooth"});}
+
+/* ---------- Dream Team screen: battle buttons, invites, history ---------- */
+function btInviteBanner(){const v=S.btInv;if(!v)return "";return `<button class="bt-inb" id="btinb"><span class="ivb-f">${flagSVG({isUser:true,flag:v.host.flag})}</span><span class="bt-inb-t"><small>⚔ BATTLE CHALLENGE</small><b>${esc(v.player)}</b><em>${FORMATS[v.fmt].short} ${v.year} · winner takes a card</em></span><span class="dt-pkgo">VIEW</span></button>`;}
+function btHistoryHTML(f,y){const v=Object.values(btRecs()).filter(r=>r.res&&(!f||f==="all"||r.fmt===f)&&(!y||y==="all"||+r.year===+y)).sort((a,b)=>b.ts-a.ts).slice(0,8),rec=btRecord();if(!v.length)return "";
+  return `<section class="bt-hist"><div class="bt-hh"><b>DREAM TEAM BATTLES</b><small>${rec.w}W · ${rec.l}L</small></div>${v.map(r=>{const k=r.res==="W"?r.won:r.lost,p=k&&cardByKey(k);
+    return `<button class="bt-hr ${r.res==="W"?"w":"l"}" data-btl="${esc(r.id)}"><span class="bt-hres">${r.res}</span><span class="bt-ht"><b>v ${esc((r.opp&&r.opp.name)||"Rival")}</b><small>${FORMATS[r.fmt].short} ${r.year} · ${esc(r.score||"")}${p?` · ${r.res==="W"?"won":"lost"} ${esc(p.name)}`:r.res==="W"?" · pick your prize":" · card pending"}</small></span><i aria-hidden="true">›</i></button>`;}).join("")}</section>`;}
+const _render11=render;
+render=function(){if(S.screen==="battle"){duelBG(true);vBattle($("#app"));document.body.classList.remove("has-nav");const n=$("#navroot");if(n)n.innerHTML="";livePub();return;}_render11();};
+/* taps on the Dream Team screen */
+document.addEventListener("click",e=>{const g=e.target.closest("[data-btgo]");if(g){e.preventDefault();btPickRival(g.dataset.btgo);return;}
+  const h=e.target.closest("[data-btl]");if(h){e.preventDefault();openBattle(h.dataset.btl);return;}
+  if(e.target.closest("#btinb")){e.preventDefault();btAcceptView();}});
+
+/* ===================== v12: match screen order ===================== */
+/* flag v flag, then YOU WON / YOU LOST with the margin, then the scorecard, then key moments, then the next game button */
+function renderMatch(fx){const T=S.T,A=teamOf(fx.a),B=teamOf(fx.b),p=Math.round(winProb(A,B,T.F)*100),stage=T.phase==="group"?`Group ${T.myGroup} · game ${T.qi+1} of ${T.queue.length}`:STAGE_NAME[T.phase];S.km=[];
+  $("#stage").innerHTML=`<div class="ph">${stage.toUpperCase()}<small>${T.F.short} World Cup ${T.year}</small></div>
+   <div class="matchup"><div class="side">${tcirc(A)}<b>${esc(A.name)}</b><small>OVR ${Math.round(A.ovr)}</small></div><div class="vsb">VS</div><div class="side">${tcirc(B)}<b>${esc(B.name)}</b><small>OVR ${Math.round(B.ovr)}</small></div></div>
+   <div class="mres" id="mres"></div>
+   <div class="neon" id="neon"><div class="sboard onair">${boardTop()}<div class="sb-body"><div class="sb-title"><span class="pl y">${esc(A.isUser?"YOU":A.code)}</span><b>V</b><span class="pl b">${esc(B.code)}</span></div>
+    <div class="sb-h"><span>BATTING</span><span>RUNS</span><span>WKTS</span><span>OVERS</span></div><div id="sbrows"><div class="sb-row dim"><span class="sb-team">TOSS</span><span class="tiles big">${tilesHTML("---")}</span><span class="tiles">${tilesHTML("-")}</span><span class="tiles">${tilesHTML("--")}</span></div></div>
+    <div class="sb-last" id="sblast">PLAYERS WALKING OUT</div></div></div></div>
+   <div id="scw" hidden></div>
+   <div class="moment" id="moment"><img src="${IMG.crowd}" alt="Stadium crowd in silhouette holding up two placards under floodlights"><div class="plc p1"><b>GAME</b><small>ON</small></div><div class="plc p2"><b>${esc(A.isUser?"YOU":A.code)}</b><small>v ${esc(B.code)}</small></div><div class="mcap" id="mcap" role="status"><span class="ov">0.0</span>Players walking out</div></div>
+   <div class="kml"><div class="kmh">KEY MOMENTS</div><div id="kml"></div></div>
+   <div class="wbar"><div class="wb-l"><span class="me">${esc(A.isUser?"YOU":A.code)} ${fx.a==="YOU"?p:100-p}%</span><span>WIN CHANCE</span><span class="op">${esc(B.code)} ${fx.a==="YOU"?100-p:p}%</span></div><div class="wb-bar"><i style="width:${fx.a==="YOU"?p:100-p}%"></i></div></div>
+   <div id="nb"></div>`;}
+
+/* ===================== v13: Dream Team filters: format, year, position ===================== */
+/* One filter bar for both tabs. Format and year are shared, position is for the collection.
+   Every chip shows how many teams or cards it would show, so empty years are easy to spot.
+   The choice is remembered on this device (dtw_ keys are not synced). */
+const DF_KEY="dtw_dfilter",DF_FMTS=Object.keys(FORMATS),DF_ROLES=["O","M","W","A","S","F"];
+function dfYears(f){const ys=new Set();(f==="all"?DF_FMTS:[f]).forEach(k=>Object.keys(FORMATS[k].ed).forEach(y=>ys.add(+y)));return [...ys].sort((a,b)=>b-a);}
+function dfLoad(){let o={};try{o=JSON.parse(localStorage.getItem(DF_KEY)||"{}")||{};}catch(e){}
+  const f=DF_FMTS.includes(o.f)?o.f:"all",y=o.y!=null&&o.y!=="all"&&dfYears(f).includes(+o.y)?+o.y:"all",r=DF_ROLES.includes(o.r)?o.r:"all";return {f,y,r};}
+function dfSave(){try{localStorage.setItem(DF_KEY,JSON.stringify(S.df));}catch(e){}}
+/* items are {fmt,year,role}; role only counts on the collection tab */
+function dfOk(x,d,useRole){return (d.f==="all"||x.fmt===d.f)&&(d.y==="all"||+x.year===+d.y)&&(!useRole||d.r==="all"||x.role===d.r);}
+function dfLabel(d,useRole){const a=[];if(d.f!=="all")a.push(FORMATS[d.f].short);if(d.y!=="all")a.push(d.y);let s=a.join(" ");if(useRole&&d.r!=="all")s+=(s?" · ":"")+ROLES[d.r].name;return s;}
+function dfBarHTML(items,useRole){const d=S.df,cnt=o=>items.filter(x=>dfOk(x,{...d,...o},useRole)).length,ys=dfYears(d.f);
+  const fmtB=["all",...DF_FMTS].map(f=>{const n=cnt({f});return `<button class="df-f ${f} ${d.f===f?"on":""}" data-dff="${f}" aria-pressed="${d.f===f}"><b>${f==="all"?"ALL":FORMATS[f].short}</b><small>${f==="all"?"FORMATS":"WORLD CUP"} · ${n}</small></button>`;}).join("");
+  const allY=`<button class="df-y all ${d.y==="all"?"on":""}" data-dfy="all" aria-pressed="${d.y==="all"}"><b>ALL</b><small>YEARS</small></button>`;
+  const yrB=[...ys.map(y=>{const n=cnt({y}),
+      dots=d.f==="all"?DF_FMTS.filter(f=>FORMATS[f].ed[y]).map(f=>`<i class="${f} ${cnt({f,y})?"":"no"}"></i>`).join(""):"";
+      return `<button class="df-y ${d.y===y?"on":""} ${n?"":"zero"}" data-dfy="${y}" aria-pressed="${d.y===y}" aria-label="${y}, ${n} ${useRole?"card":"team"}${n===1?"":"s"}"><b>${y}</b><small>${dots}${n||"–"}</small></button>`;})].join("");
+  const roleB=useRole?`<div class="dt-chips sc df-r" role="group" aria-label="Filter by position">${["all",...DF_ROLES].map(r=>{const n=cnt({r});return `<button class="dt-chip ${d.r===r?"on":""} ${n||r==="all"?"":"zero"}" data-dfr="${r}" aria-pressed="${d.r===r}">${r==="all"?"ALL":ROLES[r].short}<small>${n}</small></button>`;}).join("")}</div>`:"";
+  const n=cnt({}),lab=dfLabel(d,useRole),active=d.f!=="all"||d.y!=="all"||(useRole&&d.r!=="all");
+  return `<div class="df-fmt" role="group" aria-label="Filter by format">${fmtB}</div>
+    <div class="df-yrow" role="group" aria-label="Filter by World Cup year">${allY}<div class="df-yrs" id="dfyrs">${yrB}</div></div>${roleB}
+    <p class="df-sum"><span><b>${n}</b> ${useRole?"card":"Dream Team"}${n===1?"":"s"}${lab?` · ${esc(lab)}`:" · every World Cup"}</span>${active?`<button class="df-clr" data-dfclr>Clear filters</button>`:""}</p>`;}
+
+/* one Dream Team as a full ground preview */
+function dtSlideHTML(t){const xi=dtXI(t.s),full=xi.length===11,r=full?rateXI(xi):null;
+  return `<article class="dt-slide" aria-label="${esc(t.name)}, ${FORMATS[t.fmt].name} ${t.year}">
+    <div class="dt-sl-h"><div class="dt-sl-t">${edTag(t.fmt,t.year)}<b>${esc(t.name)}</b></div>${full?`<span class="dt-ovr"><small>OVR</small>${Math.round(r.ovr)}</span>`:`<span class="dt-ovr part"><small>PICKED</small>${xi.length}/11</span>`}</div>
+    <div class="dt-prev">${groundPreview(dtPicks(t.s))}</div>
+    <div class="dt-sl-f"><span class="dt-bal2">${dtBalChips(t.s)}</span><button class="dt-del" data-del="${esc(t.id)}" aria-label="Delete ${esc(t.name)}">${BIN}</button><button class="dt-edit" data-edit="${esc(t.id)}">EDIT</button></div>
+    ${full?`<button class="dt-btgo" data-btgo="${esc(t.id)}">${DUEL_X}<span>BATTLE</span><small>Best of 5 · winner takes a card from the loser's XI</small></button>`:""}</article>`;}
+function dtCarHTML(k,ts){return `<div class="dt-car" data-car="${k}" tabindex="0" aria-label="Dream Teams, swipe for more">${ts.map(dtSlideHTML).join("")}</div>
+  ${ts.length>1?`<div class="dt-dots" data-dots="${k}">${ts.map((t,i)=>`<button data-go="${i}" aria-label="Show ${esc(t.name)}"></button>`).join("")}</div>`:""}`;}
+const dfEdOrder=(a,b)=>b.year-a.year||DF_FMTS.indexOf(a.fmt)-DF_FMTS.indexOf(b.fmt);
+function dfGroups(arr,get){const g={};arr.forEach(x=>{const o=get(x),k=o.fmt+"-"+o.year;(g[k]=g[k]||{k,fmt:o.fmt,year:o.year,items:[]}).items.push(x);});return Object.values(g).sort(dfEdOrder);}
+
+function vDream(app){const q=packQ();S.df=S.df||dfLoad();
+  app.innerHTML=`<div class="screen dream8">${topbar()}<h2 class="t6">DREAM <span>TEAM</span></h2><p class="s6">Every World Cup you play wins a pack of its cards. Build an XI for each World Cup.</p>
+    ${q.length?packBanner(q):""}${btInviteBanner()}
+    <div class="seg" role="tablist" id="dtseg"></div><div class="df" id="dfbar"></div><div class="dt-body" id="dtbody"></div></div>`;
+  dreamDraw(app,true);}
+function dreamDraw(app,first){const list=dcolList(),teams=dteams(),d=S.df;let tab=S.dreamTab||(teams.length?"teams":"col");if(tab!=="teams"&&tab!=="col")tab="teams";
+  const seg=$("#dtseg",app),bar=$("#dfbar",app),bodyEl=$("#dtbody",app);if(!seg||!bar||!bodyEl)return;
+  seg.innerHTML=`<button role="tab" data-dt="teams" aria-selected="${tab==="teams"}">MY DREAM TEAMS</button><button role="tab" data-dt="col" aria-selected="${tab==="col"}">COLLECTION · ${list.length}</button>`;
+  const yrs0=$("#dfyrs",app),keepX=yrs0?yrs0.scrollLeft:(S.dfX||0);
+  const useRole=tab==="col",items=useRole?list.map(x=>({fmt:x.p.fmt,year:x.p.year,role:x.p.role})):teams.map(t=>({fmt:t.fmt,year:t.year}));
+  bar.innerHTML=dfBarHTML(items,useRole);
+  let body="";const lab=dfLabel(d,useRole);
+  if(tab==="teams"){const ts=teams.filter(t=>dfOk({fmt:t.fmt,year:t.year},d,false)),groups=dfGroups(ts,t=>t);
+    if(!teams.length)body=`<div class="dt-empty"><div class="dt-empty-xi">${SLOTS.slice(0,5).map(sl=>`<span>${emptyMini(sl)}</span>`).join("")}</div><p><b>No Dream Teams yet.</b> Pick a World Cup, then fill all 11 spots with cards you've won from it. Make as many line-ups as you like.</p></div>`;
+    else if(!ts.length)body=`<div class="dt-empty df-none"><p><b>No ${esc(lab)} Dream Teams yet.</b><br>${teams.length} other team${teams.length>1?"s are":" is"} hidden by the filter.</p><button class="df-clr big" data-dfclr>Show all my teams</button></div>`;
+    else body=groups.map(g=>`<section class="dt-grp" aria-label="${FORMATS[g.fmt].name} ${g.year}">${groups.length>1||d.y==="all"?`<div class="dt-grp-h"><span class="dt-grp-y">${g.year}</span>${edTag(g.fmt,g.year,true)}<span class="dt-grp-t">${esc(FORMATS[g.fmt].name)}</span><small>${g.items.length} team${g.items.length>1?"s":""}</small></div>`:""}${dtCarHTML(g.k,g.items)}</section>`).join("");
+    const one=d.f!=="all"&&d.y!=="all",k=one?d.f+"-"+d.y:null,edCards=one?list.filter(x=>edKey(x.p)===k).length:0;
+    if(teams.length>=DT_MAX)body+=`<p class="fine center">You have the maximum of ${DT_MAX} Dream Teams. Delete one to make another.</p>`;
+    else if(one&&!edCards)body+=`<p class="fine center df-note">You haven't won any ${esc(lab)} cards yet. Play the ${esc(FORMATS[d.f].name)} ${d.y} to win a Dream Pack, then build an XI here.</p>`;
+    else body+=gbtn(one?`＋ NEW ${esc(lab)} DREAM TEAM`:"＋ NEW DREAM TEAM","gold","dtnew");
+    if(!list.length)body+=`<p class="fine center" style="margin-top:10px">Your collection is empty. Finish any World Cup, the Daily or a duel to win your first pack.</p>`;
+    body+=btHistoryHTML(d.f,d.y);}
+  else{const shown=list.filter(x=>dfOk({fmt:x.p.fmt,year:x.p.year,role:x.p.role},d,true)),own={};list.forEach(x=>{own[edKey(x.p)]=(own[edKey(x.p)]||0)+1;});
+    const groups=dfGroups(shown,x=>x.p),cnt=t=>shown.filter(x=>rarity(x.p.r)===t).length;
+    body=`<div class="dt-sum">${TIERS4.map(t=>`<span class="dt-sm t-${t}"><b>${cnt(t)}</b>${RARITY_NAME[t]}</span>`).join("")}</div>
+      ${groups.length?groups.map(g=>{const tot=edTotal(g.fmt,g.year),L=g.items.filter(x=>x.p.r>=90).length,o=own[g.k]||0;
+        return `<section class="dt-ed-sec" aria-label="${FORMATS[g.fmt].name} ${g.year}"><div class="dt-ed-h"><span class="dt-grp-y sm">${g.year}</span>${edTag(g.fmt,g.year,true)}<span class="ed-t"><b>World Cup</b><small>${o} of ${tot} collected${L?` · ${L} Legend${L>1?"s":""}`:""}${d.r!=="all"?` · ${g.items.length} ${esc(ROLES[d.r].short)}`:""}</small></span><button class="dt-ed-b" data-build="${g.k}">BUILD XI</button></div>
+          <div class="dt-ed-bar"><i style="width:${Math.max(2,o/tot*100)}%"></i></div>
+          <div class="dt-grid">${g.items.map(x=>`<button class="dt-cell" data-k="${esc(x.k)}" aria-label="${esc(x.p.name)}, ${x.p.year}, rated ${x.p.r}${x.n>1?`, ${x.n} copies`:""}">${miniHTML(x.p)}${x.n>1?`<i class="dt-n">×${x.n}</i>`:""}</button>`).join("")}</div></section>`;}).join("")
+      :list.length?`<div class="dt-empty df-none"><p><b>No ${esc(lab)} cards yet.</b><br>${d.y!=="all"&&d.f!=="all"?`Play the ${esc(FORMATS[d.f].name)} ${d.y} to win a Dream Pack from it.`:"Try another year or position."}</p><button class="df-clr big" data-dfclr>Show my whole collection</button></div>`
+      :`<div class="dt-empty"><div class="dt-empty-pk">${packHTML({fin:"sf",fmt:"odi",year:2011},"mini ghost")}</div><p><b>No cards yet.</b> Finish any ODI or T20 World Cup, the Daily or a duel to win a Dream Pack of 3 cards from that World Cup. Go further for better odds.</p></div>`}
+      <button class="lb-more" id="dtodds">How Dream Pack odds work</button>`;}
+  bodyEl.innerHTML=body;
+  if(!first){bodyEl.classList.remove("df-swap");void bodyEl.offsetWidth;bodyEl.classList.add("df-swap");}
+  app.querySelectorAll(".gprev").forEach(fitPrev);
+  /* year strip: keep where it was, and bring the chosen year into view */
+  const yrs=$("#dfyrs",app);if(yrs){yrs.scrollLeft=keepX;const on=yrs.querySelector(".df-y.on");if(on){const a=on.offsetLeft,b=a+on.offsetWidth;if(a<yrs.scrollLeft+8||b>yrs.scrollLeft+yrs.clientWidth-8)yrs.scrollTo({left:a-yrs.clientWidth/2+on.offsetWidth/2,behavior:first||REDUCED?"auto":"smooth"});}
+    yrs.addEventListener("scroll",()=>{S.dfX=yrs.scrollLeft;},{passive:true});}
+  /* carousels, one per World Cup */
+  S.dtSlides=S.dtSlides||{};
+  app.querySelectorAll(".dt-car[data-car]").forEach(car=>{const k=car.dataset.car,dots=app.querySelectorAll(`.dt-dots[data-dots="${k}"] button`),slideW=()=>{const s=car.querySelector(".dt-slide");return s?s.offsetWidth+12:1;};
+    const n=car.children.length,at=Math.min(S.dtSlides[k]||0,n-1);car.scrollLeft=at*slideW();dots.forEach((b,j)=>b.classList.toggle("on",j===at));
+    car.addEventListener("scroll",()=>{const i=Math.round(car.scrollLeft/slideW());S.dtSlides[k]=i;dots.forEach((b,j)=>b.classList.toggle("on",j===i));},{passive:true});
+    dots.forEach(b=>b.onclick=()=>car.scrollTo({left:+b.dataset.go*slideW(),behavior:REDUCED?"auto":"smooth"}));});
+  /* taps */
+  const redraw=()=>{dfSave();dreamDraw(app);};
+  seg.querySelectorAll("[data-dt]").forEach(b=>b.onclick=()=>{S.dreamTab=b.dataset.dt;dreamDraw(app);});
+  bar.querySelectorAll("[data-dff]").forEach(b=>b.onclick=()=>{const f=b.dataset.dff;if(d.f===f)return;d.f=f;if(d.y!=="all"&&!dfYears(f).includes(+d.y))d.y="all";sfx.tick();redraw();});
+  bar.querySelectorAll("[data-dfy]").forEach(b=>b.onclick=()=>{const y=b.dataset.dfy==="all"?"all":+b.dataset.dfy;d.y=d.y===y&&y!=="all"?"all":y;sfx.tick();redraw();});
+  bar.querySelectorAll("[data-dfr]").forEach(b=>b.onclick=()=>{d.r=b.dataset.dfr;sfx.tick();redraw();});
+  app.querySelectorAll("[data-dfclr]").forEach(b=>b.onclick=()=>{d.f="all";d.y="all";d.r="all";S.dfX=0;const y=$("#dfyrs",app);if(y)y.scrollLeft=0;redraw();});
+  bodyEl.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{const p=cardByKey(b.dataset.k);if(p)cardModal(p);});
+  bodyEl.querySelectorAll("[data-build]").forEach(b=>b.onclick=()=>newTeam(b.dataset.build));
+  bodyEl.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{const t=dteams().find(x=>x.id===b.dataset.edit);if(t){S.dtEdit={id:t.id,name:t.name,fmt:t.fmt,year:t.year,s:{...t.s}};go("dtb");}});
+  bodyEl.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const t=dteams().find(x=>x.id===b.dataset.del);if(!t)return;
+    const m=modal(`<h3>Delete this team?</h3><p class="center">“${esc(t.name)}” will be deleted. The cards stay in your collection.</p><div class="actions two"><button class="btn ghost" data-close>Keep it</button><button class="btn pink" id="dtdelok">Delete</button></div>`);
+    $("#dtdelok",m).onclick=()=>{store.set("dteams",dteams().filter(x=>x.id!==t.id));const k=t.fmt+"-"+t.year;S.dtSlides[k]=Math.max(0,(S.dtSlides[k]||0)-1);closeModal();toast("Dream Team deleted");dreamDraw(app);};});
+  const nw=$("#dtnew",app);if(nw)nw.onclick=()=>{if(d.f!=="all"&&d.y!=="all")newTeam(d.f+"-"+d.y);else pickEdition();};
+  const od=$("#dtodds",app);if(od)od.onclick=openOdds;}
+
+/* ===================== v14: format and year where you need them ===================== */
+function edPill(fmt,year,pre){if(!fmt||!year||!FORMATS[fmt])return "";return `<p class="edp">${pre?`<em>${esc(pre)}</em>`:""}<span class="dt-ed ${fmt}">${FORMATS[fmt].short}</span><b>WORLD CUP ${year}</b></p>`;}
+
+/* ===================== v15: share the result to Instagram Stories and WhatsApp ===================== */
+/* The card is 1080x1920, the size a story wants. On phones both buttons open the share sheet with the card:
+   Instagram gets the card on its own (the message is copied so it can go on as a text sticker),
+   WhatsApp gets the card with the message as its caption. On a computer the card is saved instead,
+   and WhatsApp opens with the message ready to send. */
+const IC_STORY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.2" stroke-dasharray="4.2 2.4"/><path d="M12 8v8M8 12h8"/></svg>`;
+const IC_CHAT=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M20.5 11.6a8.4 8.4 0 0 1-12.4 7.4L3.5 20.4l1.4-4.4A8.4 8.4 0 1 1 20.5 11.6z"/><path d="M9 10.5h6M9 13.5h4"/></svg>`;
+const IC_SHR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg>`;
+const IC_DLD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4M5 20h14"/></svg>`;
+const IC_CPY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg>`;
+function shareMsg(T,me,score){const k=outcomeKey(T),F=T.F,[label]=OUTCOME[k],wins=T.path.filter(p=>p.won).length;
+  const g=T.path.filter(p=>p.stage==="G").map(p=>p.won?"🟩":"🟥").join("");
+  const ko=T.path.filter(p=>p.stage!=="G").map(p=>`${p.stage==="F"?"Final":p.stage} ${p.won?(p.stage==="F"?"🏆":"🟩"):"🟥"}`).join("  ");
+  const best=[...me.xi].sort((a,b)=>b.r-a.r)[0],url=(location.origin||"")+"/";
+  return `🏏 ${me.name} · ${F.name} ${T.year}${S.daily?` · Daily #${S.daily.no}`:""}
+${k==="champ"?"🏆 ":""}${label} · ${wins}W–${T.path.length-wins}L
+Group ${g}${ko?"\n"+ko:""}
+⭐ OVR ${Math.round(me.ovr)} · Dream Score ${score}
+Top card: ${best.name} (${best.r})
+
+Can your XI beat mine? Play Dream Team 👉 ${url}`;}
+function copyQuiet(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t).then(()=>true,()=>false);}catch(e){}return Promise.resolve(false);}
+function dlBlob(blob,name){const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);}
+/* call straight from the tap: phones only open the share sheet during the tap itself */
+function shareFile(file,text){if(!(navigator.canShare&&navigator.share))return Promise.resolve("none");let ok=false;try{ok=navigator.canShare({files:[file]});}catch(e){}if(!ok)return Promise.resolve("none");
+  return navigator.share(text?{files:[file],text}:{files:[file]}).then(()=>"ok",e=>e&&e.name==="AbortError"?"cancel":"fail");}
+function shareHTML(){return `<section class="shr" aria-label="Share your result">
+  <div class="shr-btns"><button class="shr-b ig" id="shig" disabled><i>${IC_STORY}</i><span><b>INSTAGRAM</b><small>Post to your story</small></span></button>
+   <button class="shr-b wa" id="shwa" disabled><i>${IC_CHAT}</i><span><b>WHATSAPP</b><small>Card + message</small></span></button></div>
+  <div class="shr-more"><button id="shmore" disabled>${IC_SHR}More apps</button><button id="shsave" disabled>${IC_DLD}Save card</button><button id="shcopy">${IC_CPY}Copy message</button></div>
+  <p class="shr-st" id="shst" role="status">Making your card…</p></section>`;}
+const _vResult15=vResult;
+vResult=function(app){_vResult15(app);const T=S.T,me=S.me;if(!T||!me)return;const score=dreamScore(T,me),name=`dream-team-${T.fmt}-${T.year}.png`,msg=shareMsg(T,me,score);S.share=msg;
+  const old=$("#share",app),two=old&&old.closest(".actions");if(two)two.outerHTML=shareHTML();else{const st=$("#story",app);if(st&&!$("#shig",app))st.insertAdjacentHTML("afterend",shareHTML());}
+  let blob=null,file=null;const ready=()=>{["#shig","#shwa","#shmore","#shsave"].forEach(s=>{const b=$(s);if(b)b.disabled=false;});const st=$("#shst");if(st)st.textContent="";};
+  const waitCard=()=>{const s=$("#story");if(!s||S.screen!=="result")return;if(s.src&&s.src.startsWith("data:")){fetch(s.src).then(r=>r.blob()).then(b=>{blob=b;file=new File([b],name,{type:"image/png"});ready();});}else setTimeout(waitCard,150);};waitCard();
+  const notReady=()=>{if(file)return false;toast("Your card is still being made");return true;};
+  $("#shig").onclick=()=>{if(notReady())return;const cp=copyQuiet(msg);
+    shareFile(file,null).then(async r=>{const copied=await cp;
+      if(r==="ok")toast(copied?"Message copied. Paste it on your story as a text sticker":"Shared!");
+      else if(r==="none"){dlBlob(blob,name);const m=modal(`<h3>Post it to your story</h3><ol class="shr-steps"><li><b>Your card is saved</b> as ${esc(name)}. It's story size, 1080 × 1920.</li><li>Get it onto your phone, open <b>Instagram</b>, tap <b>＋</b>, choose <b>Story</b> and pick the card.</li><li>${copied?"The message is copied. ":""}Add it as a <b>text sticker</b> so friends can find the game.</li></ol>${gbtn("GOT IT","cyan","","data-close")}`);}
+      else if(r==="fail")toast("Couldn't open the share sheet. Try Save card");});};
+  $("#shwa").onclick=()=>{if(notReady())return;const cp=copyQuiet(msg);
+    shareFile(file,msg).then(async r=>{if(r==="ok")toast("Sent with your message");
+      else if(r==="none"){dlBlob(blob,name);window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank","noopener");toast("Card saved. Attach it in the WhatsApp chat");}
+      else if(r==="fail"){await cp;window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank","noopener");}});};
+  $("#shmore").onclick=()=>{if(notReady())return;shareFile(file,msg).then(r=>{if(r==="none")copyText(msg);});};
+  $("#shsave").onclick=async()=>{if(notReady())return;const dl=await DL;if(dl){try{await dl.save({filename:name,data:blob});toast("Card saved");}catch(e){}}else{dlBlob(blob,name);toast("Card saved");}};
+  $("#shcopy").onclick=()=>copyText(msg);};
+
+/* ===================== v16: tester gift: every T20 World Cup 2007 card ===================== */
+/* A one-time gift for the two test accounts (Harsh and Akhil). It fills in every T20 2007 card they don't
+   have yet, once per account: the "gifts" note syncs with the account, so it never repeats. */
+const GIFTS=[{id:"t20-2007-all",fmt:"t20",year:2007,users:["u_gX_4c2UKJS3EOWc0Z6xR","u_Bi8eClQRK8d2d2FxD-0Y"]}];
+function applyGifts(){const A=window.DTAccount,u=A&&A.user;if(!u)return;const done=store.get("gifts",{})||{},got=[];
+  for(const g of GIFTS){if(!g.users.includes(u.id)||done[g.id]||!edOK(g.fmt,g.year))continue;const c=dcol();let add=0;
+    Object.keys(FORMATS[g.fmt].ed[g.year].teams).forEach(t=>squad(g.fmt,g.year,t).forEach(p=>{const k=cardKey(p);if(!c[k]){c[k]=1;add++;}}));
+    store.set("dcol",c);done[g.id]=Date.now();store.set("gifts",done);got.push({g,add,tot:edTotal(g.fmt,g.year)});}
+  if(!got.length)return;const x=got[0],F=FORMATS[x.g.fmt];
+  setTimeout(()=>{sfx.legend();confetti(140);const m=modal(`<div class="lvup"><div class="lvup-n">🎁</div><p class="eyb">TESTER GIFT</p><h3>EVERY ${F.short} ${x.g.year} CARD</h3><p>Hi ${esc(u.name||"there")}! <b>${x.add} new card${x.add===1?"":"s"}</b> just landed in your collection. You now own all ${x.tot} cards from the ${esc(F.name)} ${x.g.year}.</p>${gbtn("SEE THEM","gold","giftgo")}<button class="btn ghost" data-close>Later</button></div>`);
+    $("#giftgo",m).onclick=()=>{closeModal();S.df={f:x.g.fmt,y:x.g.year,r:"all"};dfSave();S.dreamTab="col";go("dream");};},1500);}
+const _boot16=boot;boot=function(){_boot16();try{applyGifts();}catch(e){}};
+
+/* ===================== v17: captains, last-over finishes, battle prize packs, rewarded ads ===================== */
+
+/* ---------- 1. TEST ADS: one player for every rewarded placement ----------
+   watchAd(placement) resolves true when the ad finished. Today it plays a 5-second test ad.
+   When Google approves the game, swap the body for adBreak({type:"reward",...}) from the H5 Games Ads API. */
+const AD_SECS=5,AD_LABEL={energy:"+1 energy can",reroll:"A free re-roll",replay:"Replay this knockout",streak:"Save your streak",wheel:"Daily lucky spin",heal:"Heal your injured player"};
+function adLog(pl){const t=todayStr(),a=store.get("adlog",{})||{};if(a.d!==t){a.d=t;a.n=0;a.p={};}a.n++;a.p[pl]=(a.p[pl]||0)+1;a.all=(a.all||0)+1;store.set("adlog",a);}
+function watchAd(pl){return new Promise(res=>{if(S.adOn)return res(false);S.adOn=1;closeModal();
+  const el=document.createElement("div");el.className="adx";el.setAttribute("role","dialog");el.setAttribute("aria-label","Ad playing");
+  el.innerHTML=`<div class="adx-card"><div class="adx-top"><span class="adx-tag">TEST AD</span><span class="adx-for">${esc(AD_LABEL[pl]||"Reward")}</span><button class="adx-x" aria-label="Close the ad">✕</button></div>
+    <div class="adx-art"><i></i><i></i><i></i><b>YOUR AD HERE</b><small>A real Google rewarded ad plays here once ads are switched on.</small></div>
+    <div class="adx-bar"><i></i></div><p class="adx-t">Reward in <b>${AD_SECS}</b>s</p></div>`;
+  document.body.appendChild(el);requestAnimationFrame(()=>el.classList.add("on"));
+  const bar=$(".adx-bar i",el),txt=$(".adx-t",el);bar.style.transition=`width ${AD_SECS}s linear`;requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.width="100%";}));
+  let left=AD_SECS,done=false,closed=false;
+  const iv=setInterval(()=>{left--;if(left>0){txt.innerHTML=`Reward in <b>${left}</b>s`;return;}clearInterval(iv);done=true;el.classList.add("done");txt.innerHTML="✓ Reward earned";$(".adx-x",el).textContent="✓";sfx.coin();setTimeout(close,800);},1000);
+  function close(){if(closed)return;closed=true;clearInterval(iv);el.classList.remove("on");setTimeout(()=>el.remove(),260);S.adOn=0;
+    if(done){adLog(pl);res(true);}else{toast("Watch the whole ad to get the reward");res(false);}}
+  $(".adx-x",el).onclick=close;});}
+
+/* energy and re-roll stores: the ad option now plays the ad player */
+function openEnergy(after){
+  const ms=nextCanMs();
+  const m=modal(`<div class="big-can" aria-hidden="true">${CAN}</div><h3>${energy().e?"Grab an energy drink":"Out of energy"}</h3>
+   <p>Every World Cup run uses one can. Cans refill on their own${ms?`, next one in <b data-en-next>${fmtT(ms)}</b>`:""}. The Daily never needs energy.</p>
+   <button class="adbtn" id="enad"><span class="adb-i">📺</span><span class="adb-t"><b>WATCH AN AD</b><small>+1 can, free</small></span><span class="adb-go">FREE</span></button>
+   <div class="packs"><button class="pack" data-can="5"><span>Six-pack</span><b>+5</b><em>₹49</em></button>
+    <button class="pack best" data-can="12"><span>Team cooler, best value</span><b>+12</b><em>₹99</em></button></div>
+   <p class="fine">Prototype: purchases are simulated, nothing is charged.</p><button class="btn ghost" data-close>Not now</button>`);
+  const give=n=>{addEnergy(n);closeModal();sfx.coin();refreshHUD();toast(`+${n} energy`);if(after)setTimeout(after,300);};
+  $("#enad",m).onclick=()=>watchAd("energy").then(ok=>{if(ok)give(1);});
+  m.querySelectorAll("[data-can]").forEach(b=>b.onclick=()=>give(+b.dataset.can));}
+function openStore(after){
+  if(S.daily&&S.screen!=="home"){toast("The Daily has no re-rolls");return;}
+  const m=modal(`<div class="dice-big" aria-hidden="true">${DICEI}</div><h3>${rerollsLeft()===0?"Out of re-rolls":"Get more re-rolls"}</h3>
+   <p>${after?"Grab one and your re-roll fires straight away.":"Every draft starts with one free re-roll. Stock up to chase the perfect XI."}</p>
+   <button class="adbtn" id="rrad"><span class="adb-i">📺</span><span class="adb-t"><b>WATCH AN AD</b><small>+1 re-roll, free</small></span><span class="adb-go">FREE</span></button>
+   <div class="packs"><button class="pack" data-pack="5"><span>Handful</span><b>+5</b><em>₹29</em></button>
+    <button class="pack best" data-pack="15"><span>Big bag, best value</span><b>+15</b><em>₹69</em></button></div>
+   <p class="fine">Prototype: purchases are simulated, nothing is charged.</p><button class="btn ghost" data-close>Not now</button>`);
+  $("#rrad",m).onclick=()=>watchAd("reroll").then(ok=>{if(ok)grant(1,after);});
+  m.querySelectorAll("[data-pack]").forEach(b=>b.onclick=()=>grant(+b.dataset.pack,after));}
+/* in the draft: out of re-rolls, the re-roll button plays an ad and fires straight away */
+function useReroll(action){if(S.daily){toast("The Daily has no re-rolls");return;}if(S.duel){toast("Duels have no re-rolls");return;}
+  if(S.free>0)S.free--;else if(S.bank>0){S.bank--;store.set("bank",S.bank);}
+  else{watchAd("reroll").then(ok=>{if(ok){bumpPill();action();}});return;}
+  bumpPill();action();}
+function rerollBtn(label,id){const n=rerollsLeft();return gbtn(`${DICEI}${label} · <span data-rr>${n?n+" left":"📺 ad"}</span>`,"violet",id);}
+function bumpPill(){const p=$("#rr");if(p){p.textContent=rerollsLeft();const b=p.closest(".hpill")||p.closest(".pill");if(b){b.classList.remove("bump");void b.offsetWidth;b.classList.add("bump");}}
+  document.querySelectorAll("[data-rr]").forEach(e=>e.textContent=rerollsLeft()?`${rerollsLeft()} left`:"📺 ad");}
+
+/* ---------- 2. CAPTAINS: a proven captain lifts the whole XI ---------- */
+/* Career captaincy record. The format matters: leading a side at a World Cup in this format counts most. */
+const CAP_WIN={odi:["Ricky Ponting","MS Dhoni","Michael Clarke","Eoin Morgan","Pat Cummins"],
+  t20:["MS Dhoni","Younis Khan","Paul Collingwood","Darren Sammy","Lasith Malinga","Aaron Finch","Jos Buttler","Rohit Sharma","Suryakumar Yadav"]};
+const CAP_WC={odi:["Sourav Ganguly","Stephen Fleming","Shaun Pollock","Nasser Hussain","Waqar Younis","Sanath Jayasuriya","Heath Streak","Carl Hooper","Steve Tikolo","Khaled Mashud",
+  "Rahul Dravid","Inzamam-ul-Haq","Mahela Jayawardene","Graeme Smith","Michael Vaughan","Brian Lara","Habibul Bashar","Prosper Utseya","Trent Johnston","Kumar Sangakkara",
+  "Shahid Afridi","Daniel Vettori","Andrew Strauss","Shakib Al Hasan","Elton Chigumbura","William Porterfield","Peter Borren","Brendon McCullum","AB de Villiers","Angelo Mathews",
+  "Misbah-ul-Haq","Jason Holder","Mashrafe Mortaza","Mohammad Nabi","Preston Mommsen","Kane Williamson","Virat Kohli","Aaron Finch","Sarfaraz Ahmed","Faf du Plessis",
+  "Dimuth Karunaratne","Gulbadin Naib","Rohit Sharma","Temba Bavuma","Babar Azam","Hashmatullah Shahidi","Jos Buttler","Dasun Shanaka","Kusal Mendis","Scott Edwards"],
+ t20:["Shoaib Malik","Ricky Ponting","Graeme Smith","Daniel Vettori","Mahela Jayawardene","Mohammad Ashraful","Ramnaresh Sarwan","Prosper Utseya","Steve Tikolo","Ryan Watson",
+  "Kumar Sangakkara","Chris Gayle","William Porterfield","Gavin Hamilton","Michael Clarke","Shahid Afridi","Shakib Al Hasan","Nawroz Mangal","George Bailey","Mohammad Hafeez",
+  "AB de Villiers","Stuart Broad","Ross Taylor","Mushfiqur Rahim","Brendan Taylor","Dinesh Chandimal","Faf du Plessis","Brendon McCullum","Peter Borren","Eoin Morgan",
+  "Kane Williamson","Steve Smith","Angelo Mathews","Mashrafe Mortaza","Asghar Stanikzai","Babar Azam","Virat Kohli","Temba Bavuma","Dasun Shanaka","Kieron Pollard",
+  "Mohammad Nabi","Mahmudullah","Gerhard Erasmus","Kyle Coetzer","Scott Edwards","Craig Ervine","Andrew Balbirnie","Aiden Markram","Rashid Khan","Mitchell Marsh",
+  "Rovman Powell","Monank Patel","Najmul Hossain Shanto","Wanindu Hasaranga"]};
+const CAP_INTL=["Joe Root","Tillakaratne Dilshan","Hashim Amla","Dwayne Bravo","Carlos Brathwaite","Ben Stokes","KL Rahul","Hardik Pandya","Shubman Gill","Shikhar Dhawan",
+  "Ajinkya Rahane","Matthew Wade","Travis Head","Shan Masood","Tamim Iqbal","Upul Tharanga","Kusal Perera","Thisara Perera","Nicholas Pooran","Paul Stirling","Sikandar Raza",
+  "Tom Latham","Tim Southee","Andrew Flintoff","Kevin Pietersen","Cameron White","Adam Gilchrist","Virender Sehwag","Suresh Raina","Gautam Gambhir","Anil Kumble",
+  "Jacques Kallis","Mark Boucher","Johan Botha","JP Duminy","Quinton de Kock","Mohammad Yousuf","Mohammad Rizwan","Shadab Khan","Denesh Ramdin","Hamilton Masakadza",
+  "Tatenda Taibu","Graeme Cremer","Mitchell Santner","Harry Brook","Salman Agha","Shai Hope","Litton Das","Charith Asalanka","Steve Smith"];
+function capRec(p){if(!p)return {t:0,b:0,icon:"",label:""};const f=FORMATS[p.fmt]?p.fmt:"odi",o=f==="odi"?"t20":"odi",F=FORMATS[f].short,n=p.name;
+  if(CAP_WIN[f].includes(n))return {t:3,b:2,icon:"🏆",label:`Won the ${F} World Cup as captain`};
+  if(CAP_WC[f].includes(n))return {t:2,b:1.2,icon:"🧢",label:`Led his country at a ${F} World Cup`};
+  if(CAP_WIN[o].includes(n)||CAP_WC[o].includes(n)||CAP_INTL.includes(n))return {t:1,b:.6,icon:"🎖️",label:"Has captained his country"};
+  return {t:0,b:0,icon:"🆕",label:"First-time captain"};}
+/* adds the captain's lift to a team made by makeTeam (ovr, batting and bowling all rise) */
+function capApply(team,idx){const p=team&&team.xi&&team.xi[idx];if(!p)return team;const r=capRec(p);
+  team.ovr=Math.round((team.ovr+r.b)*10)/10;team.bat=Math.round((team.bat+r.b)*10)/10;team.bowl=Math.round((team.bowl+r.b)*10)/10;team.cap={idx,name:p.name,b:r.b,t:r.t};return team;}
+/* the draft's captain is a card key; it only counts while that card is in the XI */
+function capSlot(){if(!S.cap||!S.picks)return null;const sl=SLOTS.find(s=>S.picks[s.id]&&cardKey(S.picks[s.id])===S.cap);return sl?sl.id:null;}
+const _buildMe17=buildMe;
+buildMe=function(){const t=_buildMe17(),sid=capSlot();if(sid)capApply(t,SLOTS.findIndex(s=>s.id===sid));return t;};
+const _startRun17=startRun;startRun=function(f,d){S.cap=null;_startRun17(f,d);};
+const _startDuelDraft17=startDuelDraft;startDuelDraft=function(id){S.cap=null;_startDuelDraft17(id);};
+/* duels and battles share the captain with the rival (c = position 0-10 in the XI) */
+const _packTeam17=packTeam;
+packTeam=function(t,picks,fmt,year){const o=_packTeam17(t,picks,fmt,year),ck=t&&t.capKey!==undefined?t.capKey:S.cap;
+  if(ck){const i=SLOTS.findIndex(s=>picks[s.id]&&cardKey(picks[s.id])===ck);if(i>=0)o.c=i;}return o;};
+const _unpackTeam17=unpackTeam;
+unpackTeam=function(o,fmt,year){const r=_unpackTeam17(o,fmt,year);if(o&&Number.isInteger(o.c)&&o.c>=0&&o.c<11){r.cap=o.c;r.raw.c=o.c;}return r;};
+/* a "C" armband drawn on the ground at the captain's spot */
+function capBadge(sid){const g=GPOS[sid];if(!g)return "";return `<span class="capb" style="left:${g[0]-43}px;top:${g[1]-58}px" aria-label="Captain">C</span>`;}
+function capPreview(picks,sid){const h=groundPreview(picks);return sid?h.replace(/<\/div><\/div>$/,capBadge(sid)+"</div></div>"):h;}
+function capRowHTML(p,rec,id,sm){return `<button class="capr ${sm?"sm":""} ${p?"set":""}" id="${id}"><span class="capr-c">C</span><span class="capr-t"><small>CAPTAIN</small><b>${p?esc(p.name):"Choose your captain"}</b><em>${p?`${rec.icon} ${esc(rec.label)}`:"A proven captain makes your whole XI stronger"}</em></span><span class="capr-b ${p?"t"+rec.t:""}">${p?(rec.b?`+${rec.b.toFixed(1)}<small>OVR</small>`:`+0<small>OVR</small>`):"PICK"}</span></button>`;}
+function openCapSheet(players,cur,onPick){const rows=players.map(p=>({p,k:cardKey(p),r:capRec(p)})).sort((a,b)=>b.r.b-a.r.b||b.p.r-a.p.r);
+  const m=modal(`<h3>Pick your captain</h3><p class="odds-p">A captain who has led his country, especially at a World Cup in this format, lifts your whole XI.</p>
+   <div class="cap-list">${rows.map(x=>`<button class="cap-row ${x.k===cur?"on":""}" data-cap="${esc(x.k)}"><span class="cap-mc">${miniHTML(x.p)}</span><span class="cap-t"><b>${esc(x.p.name)}</b><small>${x.r.icon} ${esc(x.r.label)}</small></span><span class="cap-b t${x.r.t}">+${x.r.b.toFixed(1)}</span></button>`).join("")}</div>
+   <p class="cap-key"><span>🏆 World Cup-winning captain +2.0</span><span>🧢 Led at a World Cup +1.2</span><span>🎖️ Captained his country +0.6</span><span>🆕 First time +0</span></p>
+   <button class="btn ghost" data-close>Close</button>`);
+  m.querySelectorAll("[data-cap]").forEach(b=>b.onclick=()=>{closeModal();sfx.pick();onPick(b.dataset.cap);});}
+/* team-ready screen: the captain row sits right above GO LIVE (or LOCK IN for duels) */
+const _vName17=vName;
+vName=function(app){_vName17(app);const cta=app.querySelector(".actions.cta-top")||($("#enter",app)&&$("#enter",app).closest(".actions"));if(!cta)return;
+  const sid=capSlot(),p=sid?S.picks[sid]:null,rec=capRec(p);cta.insertAdjacentHTML("beforebegin",capRowHTML(p,rec,"caprow"));
+  const st=app.querySelector(".gprev .gp-stage");if(st&&sid)st.insertAdjacentHTML("beforeend",capBadge(sid));
+  const pick=()=>openCapSheet(SLOTS.map(s=>S.picks[s.id]).filter(Boolean),S.cap,k=>{S.cap=k;render();setTimeout(()=>{const r=$("#caprow");if(r){r.classList.add("pop");}},30);toast(`${cardByKey(k)?cardByKey(k).name:"He"} leads your XI`);});
+  $("#caprow").onclick=pick;
+  const en=$("#enter",app);if(en)en.addEventListener("click",e=>{if(capSlot())return;e.stopImmediatePropagation();e.preventDefault();toast("Pick your captain first");pick();},true);};
+/* Dream Team builder: captain row in the dock and the armband on the ground */
+function dtSave(t){const a=dteams(),i=a.findIndex(x=>x.id===t.id),c={id:t.id,name:cleanName(t.name)||"Dream XI",fmt:t.fmt,year:+t.year,s:{...t.s}};
+  if(t.capK&&Object.values(c.s).includes(t.capK))c.capK=t.capK;if(i>=0)a[i]=c;else a.unshift(c);store.set("dteams",a.slice(0,DT_MAX));}
+const dtCapSid=t=>{if(!t||!t.capK)return null;const sl=SLOTS.find(s=>t.s[s.id]===t.capK);return sl?sl.id:null;};
+const _vDreamBuild17=vDreamBuild;
+vDreamBuild=function(app){_vDreamBuild17(app);const t=S.dtEdit,gf=$("#gfield",app),btns=app.querySelector(".dt-dock .dt-btns");if(!t||!gf||!btns)return;
+  btns.insertAdjacentHTML("beforebegin",`<div id="dtcapw"></div>`);
+  const upd=()=>{const sid=dtCapSid(t),p=sid?cardByKey(t.capK):null,w=$("#dtcapw");if(!w)return;w.innerHTML=capRowHTML(p,capRec(p),"dtcap",true);
+    const b=$("#dtcap");b.disabled=!dtXI(t.s).length;b.onclick=()=>{const ps=SLOTS.map(s=>t.s[s.id]&&cardByKey(t.s[s.id])).filter(Boolean);if(!ps.length)return;openCapSheet(ps,t.capK,k=>{t.capK=k;upd();});};
+    const xi=dtXI(t.s),ov=$("#dtovr b");if(ov&&xi.length===11)ov.textContent=Math.round(rateXI(xi).ovr+(p?capRec(p).b:0));
+    let bd=$("#dtcapb");const st=$("#gstage");if(!sid){if(bd)bd.remove();return;}if(!bd&&st){st.insertAdjacentHTML("beforeend",`<span id="dtcapb" class="capb fixed">C</span>`);bd=$("#dtcapb");}
+    if(bd){const g=GPOS[sid];bd.style.left=(g[0]-43)+"px";bd.style.top=(g[1]-58)+"px";}};
+  upd();new MutationObserver(upd).observe(gf,{childList:true});};
+
+/* ---------- 3. LAST-OVER FINISHES AND SUPER OVERS ---------- */
+/* Close matches keep their result, but the final over is laid out ball by ball, and a match lost by 1-2 runs
+   can end level and go to a Super Over (the side that won the match wins it). Seeded like everything else. */
+const LO_W=[[0,24],[1,32],[2,12],[3,2],[4,14],[6,8],["W",8]],SO_W=[[0,16],[1,22],[2,12],[4,24],[6,16],["W",10]];
+function wpick(ws){const t=ws.reduce((a,b)=>a+b[1],0);let x=rnd()*t;for(const [v,w] of ws){x-=w;if(x<0)return v;}return ws[0][0];}
+const ballRuns=b=>b==="W"?0:b;
+function lastOverOf(res,N){const s=res.second,tgt=res.first.runs+1,start=N-6,n=s.balls-start,won=res.winner===s.team;if(n<1||n>6)return null;
+  let best=null;
+  for(let tries=0;tries<40;tries++){const balls=[];
+    if(won){const k=s.runs-(tgt-1),opts=[1,2,4,6].filter(v=>v>=k);if(!opts.length)return null;const big=opts.filter(v=>v>=4),last=big.length&&rnd()<.6?big[Math.floor(rnd()*big.length)]:opts[Math.floor(rnd()*opts.length)];
+      for(let i=0;i<n-1;i++)balls.push(wpick(LO_W));balls.push(last);}
+    else{const allOut=s.wkts>=10&&s.balls<N;for(let i=0;i<(allOut?n-1:n);i++)balls.push(wpick(LO_W));if(allOut)balls.push("W");}
+    const w=balls.filter(b=>b==="W").length;if(w>s.wkts||(!(s.wkts>=10&&s.balls<N)&&w>2))continue;
+    const S1=balls.reduce((a,b)=>a+ballRuns(b),0),r0=s.runs-S1;if(r0<0)continue;const need=tgt-r0;
+    const o={start,balls,r0,w0:s.wkts-w,need,team:s.team};best=o;if(need>=4&&need<=(N===120?24:30))break;}
+  return best;}
+function superOverOf(res){const W=res.winner,L=res.loser;
+  const inn=need=>{const balls=[];let r=0,w=0;for(let i=0;i<6;i++){const b=wpick(SO_W);balls.push(b);if(b==="W"){w++;if(w>=2)break;}else{r+=b;if(need&&r>=need)break;}}return {balls,runs:r,wkts:w};};
+  for(let t=0;t<40;t++){const a=inn(0);if(a.runs<6)continue;const b=inn(a.runs+1);if(b.runs>a.runs)return {first:{team:L,...a},second:{team:W,...b},target:a.runs+1};}
+  return {first:{team:L,balls:[1,4,0,2,1,1],runs:9,wkts:0},second:{team:W,balls:[4,1,6],runs:11,wkts:0},target:10};}
+const _simMatch17=simMatch;
+simMatch=function(A,B,F){const res=_simMatch17(A,B,F);try{const N=F.balls,f=res.first,s=res.second,m=f.runs-s.runs,won=res.winner===s.team;
+    if(!won&&m>=1&&m<=(N===120?5:8)&&rnd()<.5){const T={[A.code]:A,[B.code]:B};s.runs=f.runs;s.card=inningsCard(T[s.team],T[f.team],s,F);res.tie=true;res.summary="won the Super Over";res.so=superOverOf(res);}
+    const inLast=s.balls>N-6;
+    if(won?inLast:((res.tie||m<=(N===120?12:16))&&(s.balls===N||inLast)))res.lo=lastOverOf(res,N);
+  }catch(e){}return res;};
+/* live view: the final over and the super over ball by ball */
+function ballCls(b){return b==="W"?"w":b===6?"six":b===4?"four":b===0?"dot":"run";}
+function ballTxt(b){return b==="W"?"W":b===0?"•":String(b);}
+const BALL_SAY={W:["OUT! Gone!","WICKET! Clean bowled!","OUT! Caught in the deep!"],6:["SIX! Into the stands!","SIX! Huge hit!","SIX! Out of the ground!"],4:["FOUR! Raced to the rope","FOUR! Through the covers","FOUR! Perfect timing"],0:["Dot ball","Beaten! Dot ball","Yorker, dug out, no run"],1:["Just a single","Pushed for one","Quick single"],2:["Two, good running","Back for two"],3:["Three, superb running"]};
+const say=b=>{const a=BALL_SAY[b];return a[Math.floor(Math.random()*a.length)];};
+function loPanel(){let el=$("#lo");if(!el){const n=$("#neon")||$("#scw");if(!n)return null;el=document.createElement("div");el.id="lo";el.className="lo";n.insertAdjacentElement("afterend",el);}return el;}
+function ballFx(b,who){if(b==="W"){sfx.wicket();buzz([40,30,40]);placards("OUT!","",who,"last over");}else if(b===6){sfx.six();confetti(18);buzz(20);placards("SIX!","",who,"last over");}
+  else if(b===4){sfx.six();buzz(15);placards("FOUR!","",who,"last over");}else sfx.tick();}
+async function playToLastOver(row,res,mom,dur){const lo=res.lo,N=S.T.F.balls,p0=lo.start/N;
+  await playInnings(row,{runs:lo.r0,wkts:lo.w0,balls:lo.start,card:res.second.card},{pops:mom.pops.filter(e=>e.t<=p0),wt:mom.wt.filter(x=>x<=p0)},Math.max(1500,dur*lo.start/Math.max(1,res.second.balls)));}
+async function lastOverBBB(res,alive){const lo=res.lo,tgt=res.first.runs+1,bat=teamOf(lo.team),row=$("#r2"),el=loPanel();if(!row||!el)return;
+  const R=row.querySelector('[data-k="r"]'),W=row.querySelector('[data-k="w"]'),O=row.querySelector('[data-k="o"]'),who=bat.isUser?"YOU":bat.code;
+  let runs=lo.r0,wk=lo.w0,b=lo.start;row.classList.add("on");
+  el.innerHTML=`<div class="lo-h"><b>LAST OVER</b><span><em>${esc(who)}</em> need <strong id="loneed">${lo.need}</strong> off <strong id="loleft">6</strong></span></div>
+    <div class="lo-balls">${[0,1,2,3,4,5].map(i=>`<i data-b="${i}"></i>`).join("")}</div><p class="lo-c" id="loc">Final over. Here we go…</p>`;
+  el.classList.remove("in");void el.offsetWidth;el.classList.add("in");$("#sblast").textContent=`LAST OVER · ${lo.need} TO WIN`;roar(.6,.05);
+  el.scrollIntoView({block:"nearest",behavior:REDUCED?"auto":"smooth"});await wait(1100);
+  for(let i=0;i<lo.balls.length;i++){if(!alive())return;const ball=lo.balls[i],slot=el.querySelector(`[data-b="${i}"]`);
+    slot.className="up";$("#loc").textContent="Running in…";await wait(700);if(!alive())return;
+    b++;if(ball==="W")wk++;else runs+=ball;slot.className=ballCls(ball);slot.textContent=ballTxt(ball);
+    setTiles(R,runs);setTiles(W,wk);setTiles(O,oversStr(b));ballFx(ball,who);
+    const need=tgt-runs,left=6-(i+1);$("#loc").textContent=say(ball);
+    if(need<=0)$("#sblast").textContent=`${who} WIN IT!`;else if(left>0){$("#loneed").textContent=need;$("#loleft").textContent=left;$("#sblast").textContent=`${need} OFF ${left}`;}
+    await wait(ball==="W"||ball>=4?950:650);}
+  setTiles(R,res.second.wkts>=10?res.second.runs:res.second.runs);setTiles(W,res.second.wkts);setTiles(O,oversStr(res.second.balls));row.classList.remove("on");
+  const h=el.querySelector(".lo-h span"),won=res.winner===lo.team,s2=res.second;
+  if(res.tie){$("#loc").textContent="Scores level!";$("#sblast").textContent="SCORES LEVEL! SUPER OVER";if(h)h.innerHTML="<strong>SCORES LEVEL</strong>";}
+  else if(won){if(h)h.innerHTML=`<em>${esc(who)}</em> <strong>GOT THERE</strong>`;}
+  else if(h)h.innerHTML=`${s2.wkts>=10?"<strong>ALL OUT</strong> · ":""}short by <strong>${res.first.runs-s2.runs}</strong>`;}
+async function superOverBBB(res,alive){const so=res.so,el=loPanel();if(!el)return;const t1=teamOf(so.first.team),t2=teamOf(so.second.team),c=t=>t.isUser?"YOU":t.code;
+  const rowH=(k,t)=>`<div class="so-row" data-so="${k}"><span class="so-tm">${flagSVG(t)}<b>${esc(c(t))}</b></span><span class="so-balls">${[0,1,2,3,4,5].map(i=>`<i data-b="${i}"></i>`).join("")}</span><b class="so-sc" id="sosc-${k}">0/0</b></div>`;
+  el.insertAdjacentHTML("beforeend",`<div class="so" id="so"><div class="so-splash">SUPER OVER</div>${rowH("first",t1)}${rowH("second",t2)}<p class="lo-c" id="soc">${esc(c(t1))} bat first. Six balls, two wickets.</p></div>`);
+  sfx.legend();roar(1,.08);if(!REDUCED&&!S.ff){stampFly("SUPER OVER!");}$("#so").scrollIntoView({block:"nearest",behavior:REDUCED?"auto":"smooth"});await wait(1500);
+  for(const k of ["first","second"]){const inn=so[k],t=teamOf(inn.team),rowEl=el.querySelector(`[data-so="${k}"]`);let r=0,w=0;rowEl.classList.add("on");
+    if(k==="second"){$("#soc").textContent=`${c(t)} need ${so.target} to win`;await wait(900);}
+    for(let i=0;i<inn.balls.length;i++){if(!alive())return;const ball=inn.balls[i],slot=rowEl.querySelector(`[data-b="${i}"]`);
+      slot.className="up";await wait(600);if(!alive())return;if(ball==="W")w++;else r+=ball;slot.className=ballCls(ball);slot.textContent=ballTxt(ball);
+      $("#sosc-"+k).textContent=`${r}/${w}`;ballFx(ball,c(t));$("#soc").textContent=say(ball)+(k==="second"&&so.target-r>0&&i<5?` · ${so.target-r} off ${5-i}`:"");
+      await wait(ball==="W"||ball>=4?900:600);}
+    rowEl.classList.remove("on");await wait(500);}
+  const wt=teamOf(res.winner);$("#soc").innerHTML=`<b>${esc(wt.isUser?"YOU WIN":wt.name.toUpperCase()+" WIN")} THE SUPER OVER!</b>`;el.querySelector(".so").classList.add("done");await wait(900);}
+
+/* ---------- 4. KNOCKOUT SECOND CHANCE (watch an ad to replay a lost QF, SF or final) ---------- */
+const _playCurrent17=playCurrent;
+playCurrent=function(T){if(T&&T===S.T&&["qf","sf","final"].includes(T.phase)&&!S.daily&&!S.duel){const {F,...rest}=T;try{S.koSnap={phase:T.phase,data:JSON.stringify(rest)};}catch(e){S.koSnap=null;}}return _playCurrent17(T);};
+function koReplayHTML(T){if(!T||S.daily||S.duel||T.koReplayUsed||!S.koSnap||S.koSnap.phase!==T.out)return "";
+  return `<button class="adbtn ko" id="koreplay"><span class="adb-i">📺</span><span class="adb-t"><b>REPLAY THE ${esc(STAGE_NAME[T.out].toUpperCase())}</b><small>Watch an ad for a second chance · once per World Cup</small></span><span class="adb-go">↻</span></button>`;}
+function koReplayBind(){const b=$("#koreplay");if(!b)return;b.onclick=()=>watchAd("replay").then(ok=>{if(!ok||!S.koSnap)return;
+  const o=JSON.parse(S.koSnap.data);o.F=FORMATS[o.fmt];o.koReplayUsed=true;S.koSnap=null;S.T=o;sfx.legend();toast("Second chance! Back to the "+STAGE_NAME[o.phase]);go("live");});}
+
+/* ---------- 5. SAVE YOUR STREAK and the DAILY LUCKY SPIN (home screen) ---------- */
+function streakBreakable(){const s=store.get("streak",{last:null,n:0})||{};if(!s.last||s.n<2)return null;const d2=new Date();d2.setDate(d2.getDate()-2);
+  if(s.last!==todayStr(d2)||s.saved===todayStr())return null;return s;}
+function saveStreak(){watchAd("streak").then(ok=>{if(!ok)return;const s=store.get("streak",{})||{},y=new Date();y.setDate(y.getDate()-1);s.last=todayStr(y);s.saved=todayStr();store.set("streak",s);
+  sfx.legend();confetti(70);toast(`🔥 ${s.n}-day streak saved. Play today's Daily to keep it going`);if(S.screen==="home")render();});}
+const LW=[{k:"rr1",t:"+1",s:"RE-ROLL",w:22,c:"#7C3AED"},{k:"en1",t:"+1",s:"ENERGY",w:18,c:"#2563EB"},{k:"xp150",t:"+150",s:"XP",w:16,c:"#0891B2"},{k:"rr2",t:"+2",s:"RE-ROLLS",w:12,c:"#9333EA"},
+  {k:"pack",t:"PACK",s:"DREAM PACK",w:12,c:"#D97706"},{k:"en3",t:"+3",s:"ENERGY",w:8,c:"#1D4ED8"},{k:"xp400",t:"+400",s:"XP",w:8,c:"#0E7490"},{k:"jack",t:"+5",s:"RE-ROLLS",w:4,c:"#E11D48"}];
+const wheelDone=()=>{const w=store.get("wheel",{})||{};return w.d===todayStr();};
+function msToMidnight(){const n=new Date(),m=new Date(n);m.setHours(24,0,0,0);return m-n;}
+function wheelGrant(z){const x0=store.get("xp",0);
+  if(z.k==="rr1"||z.k==="rr2"||z.k==="jack"){const n=z.k==="rr1"?1:z.k==="rr2"?2:5;S.bank+=n;store.set("bank",S.bank);bumpPill();return `+${n} re-roll${n>1?"s":""}`;}
+  if(z.k==="en1"||z.k==="en3"){const n=z.k==="en1"?1:3;addEnergy(n);refreshHUD();return `+${n} energy`;}
+  if(z.k==="xp150"||z.k==="xp400"){const n=z.k==="xp150"?150:400;store.set("xp",x0+n);levelUp(x0,x0+n);refreshHUD();return `+${n} XP`;}
+  const fs=Object.keys(FORMATS),f=fs[Math.floor(prand()*fs.length)],ys=Object.keys(FORMATS[f].ed),y=+ys[Math.floor(prand()*ys.length)];
+  const p=awardPack({fmt:f,year:y,fin:"group",src:"wheel"});S.wheelPack=p.id;return `a ${FORMATS[f].short} ${y} Dream Pack`;}
+function openWheel(){if(wheelDone()){toast("Come back tomorrow for another spin");return;}
+  const seg=360/LW.length,grad=LW.map((z,i)=>`${z.c} ${i*seg}deg ${(i+1)*seg}deg`).join(",");
+  const m=modal(`<h3>Daily lucky spin</h3><p class="odds-p">One free spin a day after a short ad.</p>
+   <div class="lw"><i class="lw-ptr"></i><div class="lw-wh" id="lwwh" style="background:conic-gradient(${grad})">${LW.map((z,i)=>`<span class="lw-l" style="transform:rotate(${i*seg+seg/2}deg)"><b>${z.t}</b><small>${z.s}</small></span>`).join("")}</div><span class="lw-hub">DT</span></div>
+   <p class="lw-res" id="lwres"></p><div id="lwbtns">${gbtn("📺 WATCH AD & SPIN","gold","lwgo")}<button class="btn ghost" data-close>Later</button></div>`);
+  $("#lwgo",m).onclick=()=>watchAd("wheel").then(ok=>{if(!ok)return;store.set("wheel",{d:todayStr()});
+    const tot=LW.reduce((a,z)=>a+z.w,0);let x=prand()*tot,i=0;for(;i<LW.length;i++){x-=LW[i].w;if(x<0)break;}i=Math.min(i,LW.length-1);const z=LW[i];
+    const mm=modal(`<h3>Daily lucky spin</h3><div class="lw"><i class="lw-ptr"></i><div class="lw-wh" id="lwwh" style="background:conic-gradient(${grad})">${LW.map((q,j)=>`<span class="lw-l" style="transform:rotate(${j*seg+seg/2}deg)"><b>${q.t}</b><small>${q.s}</small></span>`).join("")}</div><span class="lw-hub">DT</span></div><p class="lw-res" id="lwres">Spinning…</p><div id="lwbtns"></div>`);
+    const wh=$("#lwwh",mm),end=360*6+(360-(i*seg+seg/2))+(prand()*seg*.5-seg*.25);
+    wh.style.transition=REDUCED?"none":"transform 4.2s cubic-bezier(.12,.68,.18,1)";requestAnimationFrame(()=>requestAnimationFrame(()=>{wh.style.transform=`rotate(${end}deg)`;}));
+    let tk=0;const tick=setInterval(()=>{if(++tk>26)clearInterval(tick);else sfx.tick();},140);
+    setTimeout(()=>{clearInterval(tick);const got=wheelGrant(z);sfx.legend();confetti(z.k==="jack"||z.k==="pack"?140:70);
+      const r=$("#lwres");if(r)r.innerHTML=`<b>You won ${esc(got)}!</b>`;
+      const bb=$("#lwbtns");if(bb){bb.innerHTML=z.k==="pack"&&S.wheelPack?gbtn("OPEN THE PACK","gold","lwopen")+`<button class="btn ghost" data-close>Later</button>`:gbtn("NICE","cyan","","data-close");
+        const o=$("#lwopen");if(o)o.onclick=()=>{closeModal();openPackFlow(S.wheelPack,()=>{if(S.screen==="home")render();});};}
+      if(S.screen==="home")paintHomeExtras();},REDUCED?50:4400);});}
+function paintHomeExtras(){if(S.screen!=="home")return;let box=$("#hx17");if(!box){const a=$(".streak7");if(!a)return;a.insertAdjacentHTML("afterend",`<div id="hx17"></div>`);box=$("#hx17");}
+  const s=streakBreakable(),done=wheelDone();
+  box.innerHTML=`${s?`<section class="sks"><span class="sks-i">🔥</span><span class="sks-t"><b>Your ${s.n}-day streak is about to break</b><small>You missed yesterday's Daily. Watch an ad to save it, then play today.</small></span><button class="sks-go" id="skgo">📺 SAVE</button></section>`:""}
+   <section class="lwc ${done?"done":""}"><span class="lwc-w" aria-hidden="true"><i></i></span><span class="lwc-t"><b>DAILY LUCKY SPIN</b><small>${done?`Next spin in <em id="lwcd">${fmtT(msToMidnight())}</em>`:"Re-rolls, energy, XP or a Dream Pack"}</small></span><button class="lwc-go" id="lwcgo" ${done?"disabled":""}>${done?"DONE":"📺 SPIN"}</button></section>`;
+  const sk=$("#skgo");if(sk)sk.onclick=saveStreak;const lg=$("#lwcgo");if(lg)lg.onclick=openWheel;
+  clearInterval(S.lwIv);if(done)S.lwIv=setInterval(()=>{const e=$("#lwcd");if(!e){clearInterval(S.lwIv);return;}e.textContent=fmtT(msToMidnight());},1000);}
+const _vHome17=vHome;
+vHome=function(app){_vHome17(app);paintHomeExtras();};
+
+/* ---------- 6. DREAM TEAM BATTLES: prize pack, copies and injuries ---------- */
+/* The winner picks one of the rival's top 3 cards, face down, and gets a copy. Nothing leaves the rival's account:
+   their card is injured instead, out of battles for 3 of their games or 3 days, whichever comes first. A sub fills in. */
+const INJ_GAMES=3,INJ_MS=3*864e5,INJ_MAX=2;
+function injuries(){const o=store.get("inj",{});return o&&typeof o==="object"?o:{};}
+function injClean(){const o=injuries(),now=Date.now();let ch=false;for(const k in o){if(!o[k]||!(o[k].g>0)||now>=o[k].until){delete o[k];ch=true;}}if(ch)store.set("inj",o);return o;}
+function injTick(){const o=injClean(),healed=[];for(const k in o){o[k].g--;if(o[k].g<=0){healed.push(k);delete o[k];}}store.set("inj",o);
+  healed.forEach((k,i)=>{const p=cardByKey(k);if(p)setTimeout(()=>toast(`🩹 ${p.name} is fit again`),1600+i*1200);});}
+function injAdd(k){const o=injClean();if(!o[k]&&Object.keys(o).length>=INJ_MAX)return false;o[k]={g:INJ_GAMES,until:Date.now()+INJ_MS,at:Date.now()};store.set("inj",o);return true;}
+function injLeft(i){const d=Math.max(0,i.until-Date.now()),days=Math.max(1,Math.ceil(d/864e5));return `${i.g} game${i.g===1?"":"s"} or ${days} day${days===1?"":"s"}`;}
+function healNow(k){watchAd("heal").then(ok=>{if(!ok)return;const o=injuries();delete o[k];store.set("inj",o);const p=cardByKey(k);sfx.win();toast(`🩹 ${p?p.name:"Your player"} is fit again`);
+  if(S.screen==="dream")render();else if(S.screen==="battle")btPaintPrize();});}
+document.addEventListener("click",e=>{const h=e.target.closest("[data-heal]");if(h){e.preventDefault();healNow(h.dataset.heal);}});
+/* game counter: every finished World Cup, Daily, duel or battle heals injuries by one game */
+const _vResult17=vResult;vResult=function(app){const first=!S.scored;_vResult17(app);if(first)injTick();};
+const _matchView17=matchView;matchView=function(app,V){const r0=dGet(V&&V.id),first=!!(r0&&!r0.res&&r0.myTeam&&r0.oppTeam);_matchView17(app,V);const r1=dGet(V&&V.id);if(first&&r1&&r1.res)injTick();};
+const _vBattle17=vBattle;vBattle=function(app){const V=S.btView||{},r0=V.id&&btGet(V.id),first=!!(r0&&!r0.res&&r0.myTeam&&r0.oppTeam);_vBattle17(app);if(first&&btGet(V.id)&&btGet(V.id).res)injTick();};
+/* the XI that walks out: injured cards are replaced by the best fit from the same World Cup */
+function btSubbed(t){const inj=injClean(),own=dcolList().filter(x=>x.p.fmt===t.fmt&&x.p.year===t.year),picks={},used=new Set(),subs=[];
+  for(const sl of SLOTS){const k=t.s[sl.id],p=k&&cardByKey(k);if(!p)return null;if(!inj[k]){picks[sl.id]=p;used.add(p.name);}}
+  for(const sl of SLOTS){if(picks[sl.id])continue;const free=own.filter(x=>!used.has(x.p.name)&&!inj[x.k]).sort((a,b)=>b.p.r-a.p.r);
+    const c=free.find(x=>sl.role==="X"||x.p.role===sl.role)||free[0];if(!c)return null;picks[sl.id]=c.p;used.add(c.p.name);subs.push({sid:sl.id,out:cardByKey(t.s[sl.id]),in:c.p});}
+  return {picks,subs};}
+function btOwned(t){const c=dcol();if(!SLOTS.every(sl=>t.s[sl.id]&&c[t.s[sl.id]]>0))return false;return !!btSubbed(t);}
+function btPack(t){const sb=btSubbed(t);if(!sb)return null;const me=myTeam(),ck=t.capK&&Object.values(sb.picks).some(p=>cardKey(p)===t.capK)?t.capK:null;
+  return packTeam({name:t.name,flag:me?me.flag:GREY_FLAG,capKey:ck},sb.picks,t.fmt,t.year);}
+/* the prize: the rival's top 3 (by rating), face down in an order both phones agree on */
+function btTop3(r,xi){const idx=xi.map((p,i)=>i).sort((a,b)=>xi[b].r-xi[a].r||a-b).slice(0,3),rng=mulberry32(hashStr("pk|"+r.id));
+  for(let i=idx.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}return idx.map(i=>({i,sid:SLOTS[i].id,p:xi[i]}));}
+function btClaim(id,slot){const r=btGet(id);if(!r||r.res!=="W"||r.pick)return null;const t=safeTeam(r.oppTeam,r.fmt,r.year),i=SLOTS.findIndex(s=>s.id===slot),p=t&&t.xi[i];if(!p)return null;
+  const k=cardKey(p),c=dcol(),isNew=!c[k];c[k]=(c[k]||0)+1;store.set("dcol",c);btPut({id,pick:slot,won:k,wonNew:isNew?1:0});btSyncPub();return {p,isNew,n:c[k]};}
+function btApplyLoss(id,slot){const r=btGet(id);if(!r||r.res!=="L"||r.applied)return;const t=safeTeam(r.myTeam,r.fmt,r.year),i=SLOTS.findIndex(s=>s.id===slot),p=t&&t.xi[i];if(!p)return;
+  const k=cardKey(p),ok=injAdd(k);btPut({id,applied:1,pick:slot,lost:k,injOk:ok?1:0});btSyncPub();
+  if(S.screen==="battle"&&S.btView&&S.btView.id===id)btLoserSteal(slot);
+  else toast(ok?`🩹 ${(r.opp&&r.opp.name)||"Your rival"} beat you. ${p.name} is injured for ${INJ_GAMES} games`:`${(r.opp&&r.opp.name)||"Your rival"} won a copy of your ${p.name}`);}
+const pk3=(x,face,cls)=>`<button class="pk3 ${cls||""}" data-pos="${x.pos}" data-sl="${x.sid}" aria-label="${face?esc(x.p.name):"Face-down card "+(x.pos+1)}"><span class="pk3-in"><span class="pk3-b">${CARD_BACK}</span><span class="pk3-f">${miniHTML(x.p)}</span></span></button>`;
+function btPaintPrize(entering,forceWait){const box=$("#btprize"),r=S.btView&&btGet(S.btView.id),B=S.btB;if(!box||!r||!B)return;
+  const meC=r.role==="host"?"P1":"P2",opC=meC==="P1"?"P2":"P1",oppName=(r.opp&&r.opp.name)||"Your rival",won=r.res==="W";
+  const top=btTop3(r,B.xi[won?opC:meC]).map((x,pos)=>({...x,pos}));
+  const row=(cls,reveal)=>`<div class="pk3-row ${cls}">${top.map(x=>pk3(x,reveal,(reveal?"flip ":"")+(r.pick===x.sid?"chosen":reveal?"miss":""))).join("")}</div>`;
+  if(won&&!r.pick){box.innerHTML=`<section class="bt-prize win ${entering?"in":""}"><div class="bt-ph"><b>PRIZE PACK</b><small>${esc(poss(oppName))} top 3 cards, face down. Pick one and you get your own copy.</small></div>${row("pick",false)}<p class="pk3-note">Their card isn't taken. It's injured for ${INJ_GAMES} of their games or ${INJ_GAMES} days.</p></section>`;
+    box.querySelectorAll(".pk3-row.pick .pk3").forEach(b=>b.onclick=()=>btPickFace(+b.dataset.pos));return;}
+  if(won){const p=cardByKey(r.won);box.innerHTML=`<section class="bt-prize win done"><div class="bt-ph"><b>YOUR PRIZE</b><small id="btst">${p?`A copy of ${esc(p.name)} is in your collection.`:""} ${esc(poss(oppName))} ${p?esc(surname(p.name)):"card"} is ${r.acked?"now":"about to be"} injured for ${INJ_GAMES} games.</small></div>
+      <div class="bt-won">${p?bigCardHTML(p,!!r.wonNew):""}<i class="bt-copy">COPY</i></div>${row("",true)}</section>`;return;}
+  if(!r.applied||forceWait){box.innerHTML=`<section class="bt-prize lose ${entering?"in":""}"><div class="bt-ph"><b>YOUR TOP 3 ARE IN THEIR PACK</b><small><i class="dot"></i>${esc(oppName)} is picking one. They get a copy; yours gets injured.</small></div>${row("wait",false)}</section>`;return;}
+  const p=cardByKey(r.lost),inj=r.lost&&injuries()[r.lost];
+  box.innerHTML=`<section class="bt-prize lose done"><div class="bt-ph"><b>${p?esc(p.name.toUpperCase()):"YOUR PLAYER"} ${inj?"IS INJURED":r.injOk?"IS FIT AGAIN":"WAS COPIED"}</b><small>${esc(oppName)} won a copy. ${inj?`Yours is out of battles for ${injLeft(inj)}, and a sub fills in.`:r.injOk?"He's back in your XI.":`You already had ${INJ_MAX} injured players, so no new injury.`}</small></div>
+    ${row("",true)}${inj?`<button class="adbtn heal" data-heal="${esc(r.lost)}"><span class="adb-i">📺</span><span class="adb-t"><b>HEAL HIM NOW</b><small>Watch an ad and he's straight back</small></span><span class="adb-go">🩹</span></button>`:""}</section>`;
+  const ch=box.querySelector(".pk3.chosen");if(ch&&inj)ch.insertAdjacentHTML("beforeend",`<i class="pk3-inj">INJURED</i>`);}
+function btPaintPrizeStatus(){const r=S.btView&&btGet(S.btView.id);if(r&&r.acked&&r.res==="W"&&S.screen==="battle"&&!S.btPicking)btPaintPrize();}
+function btConfirm(sid){const r=S.btView&&btGet(S.btView.id),B=S.btB;if(!r||!B)return;const opC=r.role==="host"?"P2":"P1",x=btTop3(r,B.xi[opC]).findIndex(q=>q.sid===sid);if(x>=0)btPickFace(x);}
+async function btPickFace(pos){const r=S.btView&&btGet(S.btView.id),B=S.btB;if(!r||!B||r.pick||S.btPicking)return;S.btPicking=1;
+  const meC=r.role==="host"?"P1":"P2",opC=meC==="P1"?"P2":"P1",top=btTop3(r,B.xi[opC]),x=top[pos];if(!x){S.btPicking=0;return;}
+  const els=[...document.querySelectorAll(".pk3-row.pick .pk3")],el=els[pos];els.forEach(b=>b.disabled=true);
+  el.classList.add("lift");sfx.pick();buzz(15);await sleep(REDUCED?0:380);el.classList.add("flip");sfx.deal();
+  await sleep(REDUCED?0:650);const res=btClaim(r.id,x.sid);if(!res){S.btPicking=0;return;}
+  rarity(res.p.r)==="legend"?(sfx.legend(),stampFly("LEGEND!")):sfx.win();
+  els.forEach((b,i)=>{if(i!==pos)setTimeout(()=>{b.classList.add("flip","miss");sfx.tick();},REDUCED?0:250+i*160);});
+  await sleep(REDUCED?0:1100);
+  const target=document.querySelector(`.bt-side[data-s="${meC}"] .bt-fl`);await btFly(el,target,{cls:"gold",spin:-10});
+  if(target){const s=target.closest(".bt-side");s.classList.remove("got");void s.offsetWidth;s.classList.add("got");}
+  confetti(110,["#FFC93D","#FFE88A","#FFFFFF","#22C55E"]);S.btPicking=0;btPaintPrize();const p=$("#btprize");if(p)p.scrollIntoView({block:"start",behavior:REDUCED?"auto":"smooth"});
+  toast(`A copy of ${res.p.name} joins your collection${res.n>1?` · ×${res.n}`:""}`);}
+async function btLoserSteal(sid){const r=S.btView&&btGet(S.btView.id);if(!r)return;
+  const els=[...document.querySelectorAll(".pk3-row.wait .pk3")],el=els.find(b=>b.dataset.sl===sid);
+  if(!el){const e=$("#btend");if(e&&e.hidden){S.btLate=sid;return;}btPaintPrize();return;}
+  el.classList.add("lift");await sleep(REDUCED?0:350);el.classList.add("flip");sfx.deal();await sleep(REDUCED?0:600);
+  els.forEach((b,i)=>{if(b!==el)setTimeout(()=>b.classList.add("flip","miss"),REDUCED?0:150+i*140);});
+  if(r.injOk){el.insertAdjacentHTML("beforeend",`<i class="pk3-inj in">INJURED</i>`);sfx.wicket();buzz([40,40,40]);}
+  await sleep(REDUCED?0:1500);sfx.lose();btPaintPrize();const p=$("#btprize");if(p)p.scrollIntoView({block:"start",behavior:REDUCED?"auto":"smooth"});}
+function btHistoryHTML(f,y){const v=Object.values(btRecs()).filter(r=>r.res&&(!f||f==="all"||r.fmt===f)&&(!y||y==="all"||+r.year===+y)).sort((a,b)=>b.ts-a.ts).slice(0,8),rec=btRecord();if(!v.length)return "";
+  return `<section class="bt-hist"><div class="bt-hh"><b>DREAM TEAM BATTLES</b><small>${rec.w}W · ${rec.l}L</small></div>${v.map(r=>{const k=r.res==="W"?r.won:r.lost,p=k&&cardByKey(k);
+    return `<button class="bt-hr ${r.res==="W"?"w":"l"}" data-btl="${esc(r.id)}"><span class="bt-hres">${r.res}</span><span class="bt-ht"><b>v ${esc((r.opp&&r.opp.name)||"Rival")}</b><small>${FORMATS[r.fmt].short} ${r.year} · ${esc(r.score||"")}${p?` · ${r.res==="W"?"copied":"🩹"} ${esc(p.name)}`:r.res==="W"?" · pick your prize":" · waiting for their pick"}</small></span><i aria-hidden="true">›</i></button>`;}).join("")}</section>`;}
+/* Dream Team screen: captain armband, injuries and subs on each team */
+function dtSlideHTML(t){const xi=dtXI(t.s),full=xi.length===11,r=full?rateXI(xi):null,inj=injClean(),sid=dtCapSid(t),cap=sid?cardByKey(t.capK):null,cr=capRec(cap);
+  const hurt=SLOTS.map(sl=>t.s[sl.id]).filter(k=>k&&inj[k]),sb=hurt.length?btSubbed(t):null;
+  const ovr=full?Math.round(r.ovr+(cap?cr.b:0)):0;
+  return `<article class="dt-slide" aria-label="${esc(t.name)}, ${FORMATS[t.fmt].name} ${t.year}">
+    <div class="dt-sl-h"><div class="dt-sl-t">${edTag(t.fmt,t.year)}<b>${esc(t.name)}</b></div>${full?`<span class="dt-ovr"><small>OVR</small>${ovr}</span>`:`<span class="dt-ovr part"><small>PICKED</small>${xi.length}/11</span>`}</div>
+    <div class="dt-prev">${capPreview(dtPicks(t.s),sid)}</div>
+    ${cap?`<p class="dt-capl"><span class="capr-c">C</span><b>${esc(cap.name)}</b><small>${cr.icon} ${esc(cr.label)}${cr.b?` · +${cr.b.toFixed(1)} OVR`:""}</small></p>`:full?`<p class="dt-capl none"><span class="capr-c">C</span><small>No captain yet. Tap EDIT to name one.</small></p>`:""}
+    ${hurt.map(k=>{const p=cardByKey(k),i=inj[k],sub=sb&&sb.subs.find(x=>cardKey(x.out)===k);return `<div class="dt-inj"><span class="dt-inj-t">🩹 <b>${esc(p?p.name:"Player")}</b> injured · back in ${injLeft(i)}${sub?` · sub: ${esc(sub.in.name)}`:" · no sub available"}</span><button class="dt-inj-h" data-heal="${esc(k)}">📺 HEAL</button></div>`;}).join("")}
+    <div class="dt-sl-f"><span class="dt-bal2">${dtBalChips(t.s)}</span><button class="dt-del" data-del="${esc(t.id)}" aria-label="Delete ${esc(t.name)}">${BIN}</button><button class="dt-edit" data-edit="${esc(t.id)}">EDIT</button></div>
+    ${full?(btOwned(t)?`<button class="dt-btgo" data-btgo="${esc(t.id)}">${DUEL_X}<span>BATTLE</span><small>Best of 5 · win a copy of one of their top 3</small></button>`:`<p class="dt-noplay">Not enough fit ${FORMATS[t.fmt].short} ${t.year} cards to field a sub.</p>`):""}</article>`;}
+const _dreamDraw17=dreamDraw;
+dreamDraw=function(app,first){_dreamDraw17(app,first);const inj=injClean();app.querySelectorAll(".dt-cell[data-k]").forEach(c=>{if(inj[c.dataset.k]&&!c.querySelector(".inj-tag"))c.insertAdjacentHTML("beforeend",`<i class="inj-tag" title="Injured">🩹</i>`);});
+  /* edits keep the captain: carry capK into the builder */
+  app.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{const t=dteams().find(x=>x.id===b.dataset.edit);if(t){S.dtEdit={id:t.id,name:t.name,fmt:t.fmt,year:t.year,s:{...t.s},capK:t.capK||null};go("dtb");}});};
+
+/* ===================== v18: pack redraws, auto-spin, injured players leave the XI ===================== */
+
+/* ---------- 1. REDRAW A DREAM PACK: one fresh draw per pack, for an ad or 5 re-rolls ---------- */
+const REDRAW_COST=5;AD_LABEL.redraw="Redraw this pack";
+function packRedrawHTML(p){if(!p||p.redrawn)return "";const n=S.bank||0;
+  return `<div class="dpo-rd"><p>Not happy? <b>Redraw all 3 cards</b> once, same odds.</p><div class="dpo-rd-b">
+    <button class="rd-b ad" id="dprdad"><span>📺</span><b>WATCH AD</b></button>
+    <button class="rd-b rr" id="dprdrr" ${n<REDRAW_COST?"disabled":""}><span>${DICEI}</span><b>${REDRAW_COST} RE-ROLLS</b><small>${n<REDRAW_COST?`you have ${n}`:`you have ${n}`}</small></button></div></div>`;}
+function packRedrawBind(p,res,root,take){const ad=root.querySelector("#dprdad"),rr=root.querySelector("#dprdrr");if(!ad)return;
+  const go=()=>{ad.disabled=true;if(rr)rr.disabled=true;
+    /* the first draw goes back: those 3 cards leave the collection, a fresh pack of the same tier comes in */
+    const c=dcol();res.forEach(x=>{if(c[x.k]>1)c[x.k]--;else delete c[x.k];});store.set("dcol",c);
+    const np={...p,id:Date.now().toString(36)+Math.floor(prand()*1e8).toString(36),cards:rollPack(p.fmt,p.year,p.fin),redrawn:1,ts:Date.now()};
+    const q=packQ();q.unshift(np);store.set("packs",q.slice(0,40));
+    if(S.resPack&&S.resPack.id===p.id){S.resPack.id=np.id;S.resPack.cards=np.cards;}
+    try{const dr=Object.values(dRecs()).find(x=>x.pack===p.id);if(dr)dPut({id:dr.id,pack:np.id});}catch(e){}
+    const after=take();sfx.deal();toast("Fresh pack! Same odds, three new cards");setTimeout(()=>openPackFlow(np.id,after),120);};
+  ad.onclick=()=>watchAd("redraw").then(ok=>{if(ok)go();});
+  if(rr)rr.onclick=()=>{if((S.bank||0)<REDRAW_COST){toast(`You need ${REDRAW_COST} re-rolls`);return;}S.bank-=REDRAW_COST;store.set("bank",S.bank);bumpPill();refreshHUD();go();};}
+
+/* ---------- 2. AUTO-SPIN: after each pick the wheel spins again on its own ---------- */
+function autoSpinNext(){if(S.screen!=="draft"||S.busy||pickCount()>=11)return;const sh=$("#sheet");if(sh&&sh.classList.contains("open"))return;
+  const b=$("#spin");if(b&&!b.disabled)b.click();}
+
+/* ---------- 3. INJURED PLAYERS LEAVE THE XI (with a timer), then come back on their own ---------- */
+function fmtDur(ms){const m=Math.max(0,Math.round(ms/6e4)),d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return d?`${d}d ${h}h`:h?`${h}h ${mm}m`:`${Math.max(1,mm)}m`;}
+function injLeft(i){return `${i.g} game${i.g===1?"":"s"} or ${fmtDur(i.until-Date.now())}`;}
+const injOn=k=>injClean()[k]||null;
+function injSub(t,sid,inj){const sl=SLOTS.find(s=>s.id===sid),used=new Set(SLOTS.map(s=>t.s[s.id]).filter(Boolean).map(k=>(cardByKey(k)||{}).name));
+  const free=dcolList().filter(x=>x.p.fmt===t.fmt&&x.p.year===t.year&&!inj[x.k]&&!used.has(x.p.name)).sort((a,b)=>b.p.r-a.p.r);
+  return free.find(x=>!sl||sl.role==="X"||x.p.role===sl.role)||free[0]||null;}
+/* every Dream Team: injured players drop out (best fit comes in); fit again, they go straight back */
+function injSweep(){const inj=injClean(),a=dteams();if(!a.length)return;let ch=false;const back=[];
+  for(const t of a){t.inj=t.inj&&typeof t.inj==="object"?t.inj:{};
+    for(const sid of SLOTS.map(s=>s.id)){const k=t.s[sid];if(!k||!inj[k])continue;const sub=injSub(t,sid,inj);
+      if(sub)t.s[sid]=sub.k;else delete t.s[sid];t.inj[k]={sid,sub:sub?sub.k:null,at:Date.now()};ch=true;}
+    for(const k of Object.keys(t.inj)){if(inj[k])continue;const o=t.inj[k];delete t.inj[k];ch=true;
+      const inTeam=Object.values(t.s).includes(k);if(inTeam||!dcol()[k])continue;
+      if(!t.s[o.sid]||t.s[o.sid]===o.sub){t.s[o.sid]=k;back.push({k,t:t.name});}}
+    if(!Object.keys(t.inj).length)delete t.inj;}
+  if(ch)store.set("dteams",a);
+  back.forEach((x,i)=>{const p=cardByKey(x.k);if(p)setTimeout(()=>toast(`💪 ${p.name} is fit and back in ${x.t}`),900+i*1300);});}
+function dtSave(t){const a=dteams(),i=a.findIndex(x=>x.id===t.id),old=i>=0?a[i]:null,c={id:t.id,name:cleanName(t.name)||"Dream XI",fmt:t.fmt,year:+t.year,s:{...t.s}};
+  if(t.capK&&Object.values(c.s).includes(t.capK))c.capK=t.capK;else if(old&&old.capK&&old.inj&&old.inj[old.capK])c.capK=old.capK;
+  const inj=t.inj||(old&&old.inj);if(inj&&Object.keys(inj).length)c.inj=inj;
+  if(i>=0)a[i]=c;else a.unshift(c);store.set("dteams",a.slice(0,DT_MAX));}
+const _btApplyLoss18=btApplyLoss;btApplyLoss=function(id,slot){_btApplyLoss18(id,slot);injSweep();};
+const _injTick18=injTick;injTick=function(){_injTick18();injSweep();};
+const _healNow18=healNow;
+healNow=function(k){watchAd("heal").then(ok=>{if(!ok)return;const o=injuries();delete o[k];store.set("inj",o);const p=cardByKey(k);sfx.win();toast(`🩹 ${p?p.name:"Your player"} is fit again`);
+  injSweep();if(S.screen==="dream")render();else if(S.screen==="battle")btPaintPrize();});};
+/* Dream Team screen: sweep first, then show who's out, for how long, and who came in */
+const _dreamDraw18=dreamDraw;
+dreamDraw=function(app,first){injSweep();_dreamDraw18(app,first);const inj=injClean();
+  app.querySelectorAll(".dt-cell[data-k]").forEach(c=>{const i=inj[c.dataset.k];if(!i)return;const t=c.querySelector(".inj-tag");
+    if(t)t.outerHTML=`<i class="inj-tag2" data-injk="${esc(c.dataset.k)}">🩹 <b>${esc(injLeft(i))}</b></i>`;c.classList.add("hurt");});
+  app.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{const t=dteams().find(x=>x.id===b.dataset.edit);if(t){S.dtEdit={id:t.id,name:t.name,fmt:t.fmt,year:t.year,s:{...t.s},capK:t.capK||null,inj:t.inj||null};go("dtb");}});};
+function dtSlideHTML(t){const xi=dtXI(t.s),full=xi.length===11,r=full?rateXI(xi):null,inj=injClean(),sid=dtCapSid(t),cap=sid?cardByKey(t.capK):null,cr=capRec(cap);
+  const outs=Object.entries(t.inj||{}).filter(([k])=>inj[k]),ovr=full?Math.round(r.ovr+(cap?cr.b:0)):0,capOut=t.capK&&inj[t.capK];
+  return `<article class="dt-slide" aria-label="${esc(t.name)}, ${FORMATS[t.fmt].name} ${t.year}">
+    <div class="dt-sl-h"><div class="dt-sl-t">${edTag(t.fmt,t.year)}<b>${esc(t.name)}</b></div>${full?`<span class="dt-ovr"><small>OVR</small>${ovr}</span>`:`<span class="dt-ovr part"><small>PICKED</small>${xi.length}/11</span>`}</div>
+    <div class="dt-prev">${capPreview(dtPicks(t.s),sid)}</div>
+    ${cap?`<p class="dt-capl"><span class="capr-c">C</span><b>${esc(cap.name)}</b><small>${cr.icon} ${esc(cr.label)}${cr.b?` · +${cr.b.toFixed(1)} OVR`:""}</small></p>`:capOut?`<p class="dt-capl none"><span class="capr-c">C</span><small>Your captain is injured. He leads again when he's back.</small></p>`:full?`<p class="dt-capl none"><span class="capr-c">C</span><small>No captain yet. Tap EDIT to name one.</small></p>`:""}
+    ${outs.map(([k,o])=>{const p=cardByKey(k),sub=o.sub&&cardByKey(o.sub);return `<div class="dt-inj"><span class="dt-inj-mc">${p?miniHTML(p):""}<i>🩹</i></span><span class="dt-inj-t"><b>${esc(p?p.name:"Player")}</b> is injured<br><span class="inj-clock">⏱ back in <b data-injk="${esc(k)}">${esc(injLeft(inj[k]))}</b></span>${sub?`<br><small>${esc(sub.name)} is in for him</small>`:""}</span><button class="dt-inj-h" data-heal="${esc(k)}">📺 HEAL</button></div>`;}).join("")}
+    <div class="dt-sl-f"><span class="dt-bal2">${dtBalChips(t.s)}</span><button class="dt-del" data-del="${esc(t.id)}" aria-label="Delete ${esc(t.name)}">${BIN}</button><button class="dt-edit" data-edit="${esc(t.id)}">EDIT</button></div>
+    ${full?(btOwned(t)?`<button class="dt-btgo" data-btgo="${esc(t.id)}">${DUEL_X}<span>BATTLE</span><small>Best of 5 · win a copy of one of their top 3</small></button>`:`<p class="dt-noplay">Not enough fit ${FORMATS[t.fmt].short} ${t.year} cards to field a full XI.</p>`):`<p class="dt-noplay">${11-xi.length} spot${11-xi.length>1?"s":""} empty. Tap EDIT to fill ${11-xi.length>1?"them":"it"}.</p>`}</article>`;}
+/* the injury clocks tick on screen */
+setInterval(()=>{const els=document.querySelectorAll("[data-injk]");if(!els.length)return;const inj=injClean();els.forEach(e=>{const i=inj[e.dataset.injk];if(i){const b=e.tagName==="B"?e:e.querySelector("b");if(b)b.textContent=injLeft(i);}});},30000);
+
+/* ===================== v19: Tournament Rooms (2 to 6 players, everyone plays everyone) ===================== */
+/* The host opens a room with one of their complete Dream Teams (that fixes the World Cup) and a size from 2 to 6.
+   Players online join with a Dream Team from the same World Cup and lock in. When the room is full and everyone has
+   locked in (or the host starts early), every phone plays the same seeded round robin (2 players play a best of 3).
+   The final table decides the prizes: each player picks one face-down card from the top 3 of every team below them
+   and gets a copy. The owner's card is injured instead of taken, the same as a battle. Nothing leaves anyone's collection.
+   Live Draft rooms need no Dream Team: the host picks a World Cup, and once the room starts everyone drafts a fresh XI
+   at the same time on the duel draft screen. The table decides the prizes the same way, but a draft XI isn't anyone's
+   collection, so the winner keeps a copy and nobody is injured.
+   Messages ride on presence: rm (the room I'm in), rp (my prize picks still to deliver), ra (receipts for picks against me). */
+const RM_MIN=2,RM_MAX=6,RM_KEEP=12,RM_ABC="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",RM_HOLD=15*6e4;
+const RM_IC=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="3.5" r="1.7"/><circle cx="12" cy="20.5" r="1.7"/><circle cx="3.5" cy="12" r="1.7"/><circle cx="20.5" cy="12" r="1.7"/></svg>`;
+const ORD=n=>n+(n===1?"st":n===2?"nd":n===3?"rd":"th");
+const MEDAL=n=>n===1?"🥇":n===2?"🥈":n===3?"🥉":String(n);
+const RM_XP=(rank,n)=>80+60*(n-rank);
+ST_LABEL.rooms="Looking for a room";ST_LABEL.rm="In a tournament room";
+
+/* ---------- local records ---------- */
+const rmRecs=()=>{const a=store.get("rooms",{});return a&&typeof a==="object"?a:{};};
+const rmGet=id=>id?rmRecs()[id]||null:null;
+function rmPut(r){const a=rmRecs();a[r.id]={...(a[r.id]||{}),...r,ts:Date.now()};const ks=Object.keys(a).sort((x,y)=>a[y].ts-a[x].ts);ks.slice(RM_KEEP).forEach(k=>delete a[k]);store.set("rooms",a);return a[r.id];}
+const rmCur=()=>{const x=LIVE.extra.rm;return x?rmGet(x.id):null;};
+const rmPrizesLeft=r=>r&&r.res?Math.max(0,(r.n-r.rank)-Object.keys(r.picks||{}).length):0;
+function myBy(){const me=LIVE.peers.find(p=>p.isMe&&p.sameTab);if(me)LIVE.by=me.by;return LIVE.by||null;}
+function myName(){const t=myTeam();return t?cleanName(t.name):"You";}
+
+/* presence now also carries the room, prize picks and receipts */
+function livePub(patch){if(patch)for(const k in patch){if(patch[k]==null)delete LIVE.extra[k];else LIVE.extra[k]=patch[k];}
+  if(!LIVE.room)return;const t=myTeam(),x=LIVE.extra;
+  const pr={v:1,n:t?cleanName(t.name):"",f:t?packFlag(t.flag):null,lv:levelOf(store.get("xp",0)).n,st:S.screen,
+    inv:x.inv||null,acc:x.acc||null,d:x.d||null,bt:x.bt||null,bp:x.bp||null,ba:x.ba||null,rm:x.rm||null,rp:x.rp||null,ra:x.ra||null};
+  /* the server ignores presence over 4 KB: trim the least important parts first */
+  if(JSON.stringify(pr).length>3900){pr.ra=pr.ra&&pr.ra.slice(0,4);pr.ba=pr.ba&&pr.ba.slice(0,3);pr.rp=pr.rp&&pr.rp.slice(0,5);}
+  LIVE.room.presence(pr).catch(()=>{});}
+function rmPub(o){if(JSON.stringify(o||null)!==JSON.stringify(LIVE.extra.rm||null))livePub({rm:o||null});}
+const rmIsDraft=r=>!!r&&r.kind==="draft";
+/* how many players I've picked in this room's draft (11 once my XI is locked) */
+function rmMyCount(r){return r.lk&&r.myT?11:S.duel&&S.duel.room&&S.duel.id===r.id?pickCount():0;}
+const rmReadyLk=r=>rmIsDraft(r)&&r.st==="open"?1:r.lk&&r.myT?1:0;
+function rmHostObj(r){const go=r.st==="go"||r.st==="done",o={id:r.id,h:1,sz:r.sz,f:r.fmt,y:r.year,s:r.seed,st:go?"go":r.st==="closed"?"x":r.st==="draft"?"draft":"open",m:(r.mem||[]).map(x=>x.by)};
+  if(rmIsDraft(r))o.k="d";
+  if(go){o.tt=r.mem.map(x=>x.t);o.nn=r.mem.map(x=>x.n);}else{o.t=r.myT||null;o.lk=rmReadyLk(r);if(rmIsDraft(r))o.c=rmMyCount(r);}return o;}
+function rmMemObj(r){const o={id:r.id,j:1,t:r.myT||null,lk:rmReadyLk(r)};if(rmIsDraft(r))o.c=rmMyCount(r);return o;}
+const rmCnt=v=>Math.max(0,Math.min(11,Math.round(+v)||0));
+
+/* rooms other players have open right now */
+function openRooms(){const out=[],seen=new Set();
+  for(const p of LIVE.peers){if(p.isMe||!p.presence)continue;const rm=p.presence.rm;if(!rm||typeof rm!=="object"||rm.h!==1||rm.st!=="open")continue;
+    const id=cleanId(rm.id),sz=+rm.sz;if(!id||seen.has(id)||!(sz>=RM_MIN&&sz<=RM_MAX)||!okWC(rm.f,rm.y)||!Array.isArray(rm.m))continue;seen.add(id);
+    const i=peerInfo(p);out.push({id,host:p.by,peer:p.peer,name:i.name,flag:i.flag,lv:i.lv,sz,fmt:rm.f,year:+rm.y,n:Math.min(sz,rm.m.length),full:rm.m.length>=sz,kind:rm.k==="d"?"draft":"team"});}
+  return out;}
+
+/* ---------- the host runs the room: who's in, who's locked, when it starts ---------- */
+function rmHostTick(r){
+  if(r.st==="closed")return;
+  if(r.st!=="open"&&r.st!=="draft"){rmPub(Date.now()-(r.goAt||0)<RM_HOLD?rmHostObj(r):null);return;}
+  const now=Date.now(),dr=rmIsDraft(r),open=r.st==="open",mem=(r.mem||[]).map(x=>({...x}));S.rmAt=S.rmAt||{};
+  for(const p of LIVE.peers){if(p.isMe||!p.presence)continue;const rm=p.presence.rm;if(!rm||rm.j!==1||cleanId(rm.id)!==r.id)continue;
+    const t=rm.t?safeTeam(rm.t,r.fmt,r.year):null,i=peerInfo(p);let x=mem.find(m=>m.by===p.by);
+    if(!x){if(!open||mem.length>=r.sz)continue;x={by:p.by};mem.push(x);}
+    x.n=i.name;x.f=packFlag(i.flag);x.t=t?t.raw:null;x.lk=dr&&open?1:rm.lk===1&&t?1:0;if(dr)x.c=rmCnt(rm.c);S.rmAt[p.by]=now;}
+  if(mem[0]){const t=myTeam();mem[0]={...mem[0],n:myName(),f:t?packFlag(t.flag):null,t:r.myT||null,lk:rmReadyLk(r)};if(dr)mem[0].c=rmMyCount(r);}
+  /* while the room fills, a player gone for a few seconds has left; once the draft is on they get longer to come back */
+  const kept=open?mem.filter((x,i)=>i===0||now-(S.rmAt[x.by]||0)<6000)
+    :mem.map((x,i)=>{const y={...x};if(i>0&&now-(S.rmAt[x.by]||0)>45000)y.off=1;else delete y.off;return y;});
+  if(JSON.stringify(kept)!==JSON.stringify(r.mem||[]))r=rmPut({id:r.id,mem:kept});
+  const lk=r.mem.filter(x=>x.lk&&x.t);
+  if(open){if(dr?r.mem.length===r.sz:r.mem.length===r.sz&&lk.length===r.sz){rmStart(r);return;}}
+  else if(lk.length>=RM_MIN&&!r.mem.some(x=>!(x.lk&&x.t)&&!x.off)){rmStart(r);return;}
+  rmPub(rmHostObj(r));}
+function rmStart(r){r=r&&rmGet(r.id);if(!r||r.role!=="host"||(r.st!=="open"&&r.st!=="draft"))return;
+  /* a draft room starts with the draft; the matches come once the XIs are in */
+  if(rmIsDraft(r)&&r.st==="open"){if((r.mem||[]).length<RM_MIN)return;
+    r=rmPut({id:r.id,st:"draft",draftAt:Date.now(),mem:r.mem.map(x=>({...x,t:null,lk:0,c:0}))});rmPub(rmHostObj(r));rmDraftGo(r);return;}
+  const lk=(r.mem||[]).filter(x=>x.lk&&x.t);if(lk.length<RM_MIN)return;
+  r=rmPut({id:r.id,mem:lk,st:"go",goAt:Date.now()});rmPub(rmHostObj(r));rmFinish(r);}
+
+/* ---------- a member follows the host ---------- */
+function rmMemberTick(r){
+  if(r.st!=="open"&&r.st!=="draft"){rmPub(r.st!=="closed"&&r.st!=="left"&&Date.now()-(r.goAt||0)<RM_HOLD?rmMemObj(r):null);return;}
+  const hp=LIVE.peers.find(p=>p.by===r.host&&!p.isMe&&p.presence&&p.presence.rm&&p.presence.rm.h===1&&cleanId(p.presence.rm.id)===r.id);
+  if(!hp){if(!S.rmLost)S.rmLost=Date.now();else if(Date.now()-S.rmLost>(r.st==="draft"?60000:9000)){S.rmLost=0;rmClosed(r,"The host left the room");}return;}
+  S.rmLost=0;const hr=hp.presence.rm,m=Array.isArray(hr.m)?hr.m.map(String).slice(0,RM_MAX):[],dr=rmIsDraft(r);
+  if(hr.st==="x"){rmClosed(r,"The host closed the room");return;}
+  if(hr.st==="go"){if(!m.includes(r.me)){rmClosed(r,"The room started without you",1);return;}
+    const tt=Array.isArray(hr.tt)?hr.tt:[],nn=Array.isArray(hr.nn)?hr.nn:[];if(m.length<RM_MIN||tt.length!==m.length)return;
+    const mem=[];for(let i=0;i<m.length;i++){const t=safeTeam(tt[i],r.fmt,r.year);if(!t)return;mem.push({by:m[i],n:m[i]===r.me?myName():cleanName(nn[i])||"Player",t:t.raw,lk:1});}
+    r=rmPut({id:r.id,mem,seed:hr.s>>>0,st:"go",goAt:Date.now()});rmPub(rmMemObj(r));rmFinish(r);return;}
+  if(hr.st==="draft"&&r.st==="open"){if(!m.includes(r.me)){rmClosed(r,"The draft started without you",1);return;}
+    r=rmPut({id:r.id,st:"draft",seed:hr.s>>>0});rmDraftGo(r);}
+  const hi=peerInfo(hp),ready=dr&&hr.st==="open",mem=m.map(by=>{
+    if(by===r.me){const t=myTeam(),o={by,n:myName(),f:t?packFlag(t.flag):null,t:r.myT||null,lk:rmReadyLk(r)};if(dr)o.c=rmMyCount(r);return o;}
+    let src=null;if(by===r.host)src={rm:hr,i:hi};else{const p=LIVE.peers.find(q=>q.by===by&&q.presence&&q.presence.rm&&cleanId(q.presence.rm.id)===r.id);if(p)src={rm:p.presence.rm,i:peerInfo(p)};}
+    if(!src){const o={by,n:"Player",f:null,t:null,lk:0,off:1};if(dr)o.c=0;return o;}
+    const t=src.rm.t?safeTeam(src.rm.t,r.fmt,r.year):null,o={by,n:src.i.name,f:packFlag(src.i.flag),t:t?t.raw:null,lk:ready?1:src.rm.lk===1&&t?1:0};if(dr)o.c=rmCnt(src.rm.c);return o;});
+  const nx={sz:Math.min(RM_MAX,Math.max(RM_MIN,+hr.sz||r.sz)),seed:hr.s>>>0,mem,inRoom:m.includes(r.me)?1:m.length>=(+hr.sz||r.sz)?0:2,hostName:hi.name};
+  if(JSON.stringify([r.sz,r.seed,r.mem,r.inRoom,r.hostName])!==JSON.stringify([nx.sz,nx.seed,nx.mem,nx.inRoom,nx.hostName]))r=rmPut({id:r.id,...nx});
+  rmPub(rmMemObj(r));}
+/* a draft room's energy can comes back if the room ends before your draft starts */
+function rmRefund(r){if(!rmIsDraft(r)||!r.paid||r.drafted||r.refunded)return false;rmPut({id:r.id,refunded:1});addEnergy(1);refreshHUD();return true;}
+function rmClosed(r,msg,missed){const back=rmRefund(r);rmPut({id:r.id,st:"closed",missed:missed?1:0});rmPub(null);store.set("rmAct",null);toast(msg+(back?". Your energy can is back":""));
+  if(S.screen==="rm"&&S.rmView&&S.rmView.id===r.id)rmRefresh(true);}
+
+/* ---------- the tournament: same seed, same table on every phone ---------- */
+function rmFixtures(n){const a=[...Array(n).keys()];if(n%2)a.push(-1);const N=a.length,out=[];
+  for(let rd=0;rd<N-1;rd++){for(let i=0;i<N/2;i++){const x=a[i],y=a[N-1-i];if(x>=0&&y>=0)out.push({rd,a:rd%2?y:x,b:rd%2?x:y});}a.splice(1,0,a.pop());}
+  return out;}
+function rmRun(r){if(!r||!Array.isArray(r.mem)||r.mem.length<RM_MIN)return null;
+  const key=r.id+"|"+r.seed+"|"+JSON.stringify(r.mem.map(x=>x.t));if(S.rmRunC&&S.rmRunC.key===key)return S.rmRunC.run;
+  const ts=r.mem.map(x=>safeTeam(x.t,r.fmt,r.year));if(ts.some(t=>!t))return null;
+  const F=FORMATS[r.fmt],T={F,fmt:r.fmt,year:r.year,teams:{},groups:{R:[]},results:[]},prev=RNG;
+  setSeed(hashStr("rm|"+r.id+"|"+r.seed));
+  ts.forEach((t,i)=>{const c="R"+i,x=makeTeam(c,t.name,t.flag.c[0],t.xi,true);x.flag=t.flag;if(t.cap!=null)capApply(x,t.cap);T.teams[c]=x;T.groups.R.push(c);});
+  const games=[];
+  try{if(ts.length===2){const w={R0:0,R1:0};for(let k=0;k<3&&w.R0<2&&w.R1<2;k++){const g=simMatch(T.teams.R0,T.teams.R1,F);Object.assign(g,{group:"R",rd:k,ra:0,rb:1});games.push(g);w[g.winner]++;}}
+    else for(const f of rmFixtures(ts.length)){const g=simMatch(T.teams["R"+f.a],T.teams["R"+f.b],F);Object.assign(g,{group:"R",rd:f.rd,ra:f.a,rb:f.b});games.push(g);}}
+  finally{RNG=prev;}
+  T.results=games;const tab=table(T,"R"),run={T,games,tab,order:tab.map(x=>+x.code.slice(1))};S.rmRunC={key,run};return run;}
+function rmPlaces(r,run){const me=r.mem.findIndex(x=>x.by===r.me),pos=run.order.indexOf(me);return {me,pos,below:run.order.slice(pos+1),above:run.order.slice(0,pos)};}
+function rmFinish(r){r=r&&rmGet(r.id);if(!r||r.res)return;const run=rmRun(r);if(!run)return;const pl=rmPlaces(r,run);if(pl.me<0)return;
+  const n=r.mem.length,rank=pl.pos+1,g=RM_XP(rank,n);rmPut({id:r.id,res:1,st:"done",rank,n,xp:g});store.set("rmAct",r.id);
+  const x0=store.get("xp",0);store.set("xp",x0+g);levelUp(x0,x0+g);injTick();refreshHUD();
+  if(S.screen==="rm"&&S.rmView&&S.rmView.id===r.id)render();else rmResultBar(rmGet(r.id));}
+
+/* ---------- prizes: a face-down top 3 for every pair, in an order both phones agree on ---------- */
+function rmTop3(r,winBy,li){const L=r.mem[li],t=L&&safeTeam(L.t,r.fmt,r.year);if(!t)return [];const xi=t.xi;
+  const idx=xi.map((p,i)=>i).sort((a,b)=>xi[b].r-xi[a].r||a-b).slice(0,3),rng=mulberry32(hashStr("rmpk|"+r.id+"|"+winBy+"|"+L.by));
+  for(let i=idx.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}
+  return idx.map((i,pos)=>({i,pos,sid:SLOTS[i].id,p:xi[i]}));}
+function rmClaim(id,lby,sid){const r=rmGet(id);if(!r||!r.res)return null;const run=rmRun(r);if(!run)return null;const pl=rmPlaces(r,run),li=r.mem.findIndex(x=>x.by===lby);
+  if(li<0||!pl.below.includes(li)||(r.picks&&r.picks[lby]))return null;const x=rmTop3(r,r.me,li).find(q=>q.sid===sid);if(!x)return null;
+  const k=cardKey(x.p),c=dcol(),isNew=!c[k];c[k]=(c[k]||0)+1;store.set("dcol",c);
+  rmPut({id,picks:{...(r.picks||{}),[lby]:{s:sid,k,nw:isNew?1:0}}});rmSyncPub();return {p:x.p,isNew,n:c[k]};}
+function rmApplyHit(r,wby,sid){const run=rmRun(r);if(!run)return false;const pl=rmPlaces(r,run),wi=r.mem.findIndex(x=>x.by===wby);
+  if(wi<0||!pl.above.includes(wi)||(r.hits&&r.hits[wby]))return false;const x=rmTop3(r,wby,pl.me).find(q=>q.sid===sid);if(!x)return false;
+  const dr=rmIsDraft(r),k=cardKey(x.p),ok=dr?false:injAdd(k);rmPut({id:r.id,hits:{...(r.hits||{}),[wby]:{s:sid,k,injOk:ok?1:0}}});if(!dr)injSweep();
+  const who=r.mem[wi].n||"A rival";
+  if(S.screen==="rm"&&S.rmView&&S.rmView.id===r.id){(S.rmHitNew=S.rmHitNew||{})[r.id+wby]=1;if(ok){sfx.wicket();buzz([40,40,40]);}}
+  else toast(ok?`🩹 ${who} won a copy of your ${x.p.name}. Yours is injured for ${INJ_GAMES} games`:`${who} won a copy of your ${x.p.name}`);
+  return true;}
+function rmSyncPub(){const v=Object.values(rmRecs()).sort((a,b)=>b.ts-a.ts),rp=[],ra=[];
+  for(const r of v){if(r.picks)for(const b in r.picks){const x=r.picks[b];if(x&&!x.acked&&rp.length<10)rp.push({i:r.id,b,s:x.s});}
+    if(r.hits)for(const b in r.hits)if(ra.length<12)ra.push({i:r.id,b});}
+  const a=rp.length?rp:null,b=ra.length?ra:null;
+  if(JSON.stringify([a,b])!==JSON.stringify([LIVE.extra.rp||null,LIVE.extra.ra||null]))livePub({rp:a,ra:b});}
+
+/* ---------- every presence change: run my room, deliver picks, read receipts ---------- */
+function rmResume(){if(!LIVE.extra.rm){const r=rmGet(store.get("rmAct",null)),now=Date.now();
+    if(r&&(((r.st==="open"||r.st==="draft")&&now-r.ts<30*6e4)||((r.st==="go"||r.st==="done")&&now-(r.goAt||0)<RM_HOLD)))rmPub(r.role==="host"?rmHostObj(r):rmMemObj(r));}
+  rmSyncPub();}
+function roomTick(){if(!LIVE.room)return;const me=myBy();if(!me)return;
+  if(!S.rmResumed){S.rmResumed=1;rmResume();}
+  const r=rmCur();if(r){if(r.role==="host")rmHostTick(r);else rmMemberTick(r);}
+  let ch=false;
+  for(const p of LIVE.peers){if(p.isMe||!p.presence)continue;const pr=p.presence;
+    if(Array.isArray(pr.rp))for(const x of pr.rp.slice(0,10)){if(!x||x.b!==me)continue;const rr=rmGet(cleanId(x.i));if(!rr||!rr.res||(rr.hits&&rr.hits[p.by]))continue;if(rmApplyHit(rr,p.by,String(x.s)))ch=true;}
+    if(Array.isArray(pr.ra))for(const x of pr.ra.slice(0,12)){if(!x||x.b!==me)continue;const rr=rmGet(cleanId(x.i)),pk=rr&&rr.picks&&rr.picks[p.by];if(pk&&!pk.acked){rmPut({id:rr.id,picks:{...rr.picks,[p.by]:{...pk,acked:1}}});ch=true;}}}
+  if(ch)rmSyncPub();
+  rmInviteCheck();
+  if(S.screen==="rooms")roomsRefresh();else if(S.screen==="rm")rmRefresh();else if(S.screen==="draft"||S.screen==="name")rmDraftStrip();homeRoomsRefresh();}
+const _duelTick19=duelTick;
+duelTick=function(){_duelTick19();try{roomTick();}catch(e){console.error(e);}};
+setInterval(()=>{if(LIVE.room&&(LIVE.extra.rm||S.rmWant))try{roomTick();}catch(e){console.error(e);}},2000);
+
+/* ---------- invites: a new room you can join, a room link, results that came in elsewhere ---------- */
+function rmBar(o){let el=$("#rmbar");if(!el){el=document.createElement("div");el.id="rmbar";document.body.appendChild(el);}
+  el.innerHTML=`<div class="ivb rm-ivb" role="alert"><span class="ivb-f">${flagSVG({isUser:true,flag:o.flag})}</span><div class="ivb-t"><b>${esc(o.title)}</b><small>${esc(o.sub)}</small></div>
+   <button class="ivb-y" id="rmby">${esc(o.btn)}</button><button class="ivb-n" id="rmbx" aria-label="Not now">✕</button></div>`;
+  el.classList.add("on");sfx.legend();buzz([30,60,30]);
+  $("#rmby").onclick=()=>{el.classList.remove("on");o.go();};$("#rmbx").onclick=()=>el.classList.remove("on");
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("on"),30000);}
+function rmResultBar(r){if(!r||!r.res)return;const t=myTeam();
+  rmBar({flag:t?t.flag:GREY_FLAG,title:`Room ${r.id}: results are in`,sub:`You finished ${ORD(r.rank)} of ${r.n}${rmPrizesLeft(r)?" · pick your prizes":""}`,btn:"VIEW",go:()=>{S.rmView={id:r.id};go("rm");}});}
+function rmInviteCheck(){const o=openRooms();
+  if(S.rmWant){const w=o.find(x=>x.id===S.rmWant);if(w){S.rmWant=null;rmJoinView(w);}else if(Date.now()-(S.rmWantAt||0)>20000){toast(`Room ${S.rmWant} isn't open right now`);S.rmWant=null;}}
+  const cur=rmCur(),busy=["draft","live","battle","rm","rooms","name","year","team"].includes(S.screen)||(cur&&cur.st==="open");S.rmSeen=S.rmSeen||{};
+  for(const x of o){if(S.rmSeen[x.id])continue;S.rmSeen[x.id]=1;if(busy||x.full)continue;
+    if(x.kind!=="draft"&&!dteams().some(t=>t.fmt===x.fmt&&t.year===x.year&&btReady(t)))continue;
+    rmBar({flag:x.flag,title:x.name,sub:`${x.kind==="draft"?"⚡ Opened a live draft room":`🏟 Opened a ${x.sz}-player room`} · ${FORMATS[x.fmt].short} ${x.year}`,btn:"VIEW",go:()=>{const y=openRooms().find(q=>q.id===x.id);if(y)rmJoinView(y);else toast("That room just closed");}});break;}}
+const rmLink=id=>location.origin+"/#room="+id;
+function rmShare(r){const url=rmLink(r.id),text=rmIsDraft(r)?`Join my Dream Team live draft room ${r.id}: ${FORMATS[r.fmt].name} ${r.year}, ${r.sz} players. We all draft our XI at the same time.`:`Join my Dream Team room ${r.id}: ${FORMATS[r.fmt].name} ${r.year}, ${r.sz} players. Bring a complete ${FORMATS[r.fmt].short} ${r.year} Dream Team.`;
+  if(navigator.share&&/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){navigator.share({title:"Dream Team room "+r.id,text,url}).catch(()=>{});return;}
+  copyText(text+" "+url);}
+function consumeRoomLink(){if(!myTeam())return;const m=location.hash.match(/^#room=([A-Za-z0-9]{4,8})$/);if(!m)return;history.replaceState(null,"",location.pathname+location.search);
+  const id=cleanId(m[1]).toUpperCase(),r=rmGet(id);if(r&&(r.res||r.st==="open"||r.st==="draft")){setTimeout(()=>{S.rmView={id};go("rm");},60);return;}
+  S.rmWant=id;S.rmWantAt=Date.now();toast(`Looking for room ${id}…`);}
+
+/* ---------- open, join, lock in, leave ---------- */
+function rmTeamRow(t,attr,on){return `<button class="ed-row ${on?"on":""}" ${attr}="${esc(t.id)}" aria-pressed="${!!on}">${edTag(t.fmt,t.year)}<span class="ed-t"><b>${esc(t.name)}</b><small>OVR ${Math.round(rateXI(dtXI(t.s)).ovr)} · ${esc(FORMATS[t.fmt].name)} ${t.year}</small></span><i aria-hidden="true">${on?"✓":"›"}</i></button>`;}
+function rmCreate(teamId){if(!LIVE.room||!myBy()){toast("Connecting to the room server… try again in a moment");return;}
+  const ready=dteams().filter(btReady);
+  let kind=teamId?"team":S.rmKind||"draft",sz=S.rmSz||4,pick=ready.some(t=>t.id===teamId)?teamId:ready.length===1?ready[0].id:null,fmt=S.rmFmt||"t20",year=S.rmYear||null;
+  const m=modal(`<h3>Open a room</h3><div class="seg rm-kseg" role="tablist"><button role="tab" data-k="draft">⚡ LIVE DRAFT</button><button role="tab" data-k="team">🃏 DREAM TEAMS</button></div>
+    <p class="rm-kd" id="rmkd"></p><span class="dt-fl">HOW MANY PLAYERS?</span><div class="rm-sz" role="radiogroup" aria-label="Number of players">${[2,3,4,5,6].map(n=>`<button class="rm-szb" role="radio" data-sz="${n}">${n}</button>`).join("")}</div>
+    <div id="rmkb"></div><div id="rmgow"></div><button class="btn ghost" data-close>Cancel</button>`);
+  const paint=()=>{m.querySelectorAll("[data-k]").forEach(b=>b.setAttribute("aria-selected",b.dataset.k===kind));
+    m.querySelectorAll("[data-sz]").forEach(b=>{const on=+b.dataset.sz===sz;b.classList.toggle("on",on);b.setAttribute("aria-checked",on);});
+    $("#rmkd",m).textContent=kind==="draft"?"No Dream Team needed. Everyone drafts a fresh XI at the same time, then everyone plays everyone.":"Everyone brings a complete Dream Team from the same World Cup. Losing cards get injured.";
+    const kb=$("#rmkb",m),gw=$("#rmgow",m);
+    if(kind==="draft"){const ys=Object.keys(FORMATS[fmt].ed).map(Number);
+      kb.innerHTML=`<span class="dt-fl">WHICH WORLD CUP?</span><div class="seg rm-fseg" role="tablist"><button role="tab" data-f="odi" aria-selected="${fmt==="odi"}">ODI · 50 overs</button><button role="tab" data-f="t20" aria-selected="${fmt==="t20"}">T20 · 20 overs</button></div>
+        <div class="dl-years rm-years">${ys.map(y=>`<button class="dl-y ${y===year?"on":""}" data-y="${y}" aria-pressed="${y===year}"><b>${y}</b><small>${esc(TEAMS[FORMATS[fmt].ed[y].champ][0])}</small></button>`).join("")}<button class="dl-y rnd ${year==="r"?"on":""}" data-y="r" aria-pressed="${year==="r"}"><b>?</b><small>Surprise</small></button></div>
+        <p class="fine center">Uses 1 energy can. You get it back if the room closes before the draft starts.</p>`;
+      gw.innerHTML=gbtn(year?`⚡ OPEN A ${sz}-PLAYER ROOM`:"PICK A WORLD CUP","gold","rmgo",year?"":"disabled");
+      kb.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{if(fmt===b.dataset.f)return;fmt=S.rmFmt=b.dataset.f;year=null;sfx.tick();paint();});
+      kb.querySelectorAll("[data-y]").forEach(b=>b.onclick=()=>{year=b.dataset.y==="r"?"r":+b.dataset.y;S.rmYear=year;sfx.tick();paint();});
+      const g=$("#rmgo",m);if(g&&year)g.onclick=()=>{closeModal();const y=year==="r"?pickV(ys):year;withEnergy(()=>rmCreateDraft(fmt,y,sz));};}
+    else if(!ready.length){kb.innerHTML=`<div class="dt-none"><p>You need a <b>complete Dream Team</b> for this kind of room. Fill all 11 spots with cards from one World Cup, or open a live draft room instead.</p></div>`;
+      gw.innerHTML=gbtn("MY DREAM TEAMS","cyan","rmgo");$("#rmgo",m).onclick=()=>{closeModal();S.dreamTab="teams";go("dream");};}
+    else{kb.innerHTML=`<span class="dt-fl">YOUR DREAM TEAM</span><div class="ed-list">${ready.map(t=>rmTeamRow(t,"data-rmc",t.id===pick)).join("")}</div><p class="fine center">Players who join need a complete Dream Team from the same World Cup.</p>`;
+      gw.innerHTML=gbtn(pick?`${RM_IC}OPEN A ${sz}-PLAYER ROOM`:"PICK A TEAM FIRST","gold","rmgo",pick?"":"disabled");
+      kb.querySelectorAll("[data-rmc]").forEach(b=>b.onclick=()=>{pick=b.dataset.rmc;sfx.tick();paint();});
+      const g=$("#rmgo",m);if(g&&pick)g.onclick=()=>{closeModal();rmCreateGo(pick,sz);};}};
+  m.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{kind=S.rmKind=b.dataset.k;sfx.tick();paint();});
+  m.querySelectorAll("[data-sz]").forEach(b=>b.onclick=()=>{sz=+b.dataset.sz;S.rmSz=sz;sfx.tick();paint();});paint();}
+function rmNewId(){let id;do{id="";for(let i=0;i<5;i++)id+=RM_ABC[Math.floor(Math.random()*RM_ABC.length)];}while(rmGet(id));return id;}
+function rmCreateDraft(fmt,year,sz){const me=myBy();if(!me||!okWC(fmt,year)){addEnergy(1);refreshHUD();return;}rmLeaveCurrent();rmBarOff();const id=rmNewId(),t=myTeam();
+  const r=rmPut({id,kind:"draft",role:"host",host:me,me,sz:Math.min(RM_MAX,Math.max(RM_MIN,sz)),fmt,year,seed:Math.floor(Math.random()*4294967295),myT:null,lk:1,paid:1,st:"open",hostName:myName(),mem:[{by:me,n:myName(),f:t?packFlag(t.flag):null,t:null,lk:1,c:0}]});
+  store.set("rmAct",id);rmPub(rmHostObj(r));sfx.pick();S.rmView={id};go("rm");}
+function rmBarOff(){const el=$("#rmbar");if(el)el.classList.remove("on");}
+function rmCreateGo(teamId,sz){const t=dteams().find(x=>x.id===teamId),me=myBy();if(!t||!btReady(t)||!me)return;const pk=btPack(t);if(!pk)return;
+  rmLeaveCurrent();rmBarOff();const id=rmNewId();
+  const r=rmPut({id,role:"host",host:me,me,sz:Math.min(RM_MAX,Math.max(RM_MIN,sz)),fmt:t.fmt,year:t.year,seed:Math.floor(Math.random()*4294967295),myDt:t.id,myT:pk,lk:1,st:"open",hostName:myName(),mem:[{by:me,n:myName(),t:pk,lk:1}]});
+  store.set("rmAct",id);rmPub(rmHostObj(r));sfx.pick();S.rmView={id};go("rm");}
+function rmJoinView(o){const cur=rmCur();if(cur&&cur.id===o.id){S.rmView={id:o.id};go("rm");return;}
+  if(o.kind==="draft"){const m=modal(`<h3>Live draft room</h3><div class="bt-mh"><span class="bt-mf">${flagSVG({isUser:true,flag:o.flag})}</span><b>${esc(o.name)}'s room</b><span>Code ${esc(o.id)} · ${esc(FORMATS[o.fmt].name)} ${o.year} · ${o.n} of ${o.sz} players</span></div>
+     <p class="odds-p">No Dream Team needed. When the room starts, everyone drafts a fresh XI at the same time. Then everyone plays everyone, and you pick a prize from every team that finishes below you.</p>
+     ${o.full?`<div class="dt-none"><p><b>This room is full.</b></p></div>`:gbtn("⚡ JOIN THE DRAFT","gold","rmjd")+`<p class="fine center">Uses 1 energy can. You get it back if the room closes before the draft starts.</p>`}
+     <button class="btn ghost" data-close>Not now</button>`);
+    const j=$("#rmjd",m);if(j)j.onclick=()=>{closeModal();withEnergy(()=>rmJoin(o,null));};return;}
+  const mine=dteams().filter(t=>t.fmt===o.fmt&&t.year===o.year),ready=mine.filter(btReady),edn=`${FORMATS[o.fmt].short} ${o.year}`;
+  const m=modal(`<h3>Tournament room</h3><div class="bt-mh"><span class="bt-mf">${flagSVG({isUser:true,flag:o.flag})}</span><b>${esc(o.name)}'s room</b><span>Code ${esc(o.id)} · ${esc(FORMATS[o.fmt].name)} ${o.year} · ${o.n} of ${o.sz} players</span></div>
+   <p class="odds-p">Everyone plays everyone. You pick a prize from every team that finishes below you.</p>
+   ${o.full?`<div class="dt-none"><p><b>This room is full.</b></p></div>`:ready.length?`<span class="dt-fl">JOIN WITH YOUR ${edn} DREAM TEAM</span><div class="ed-list">${ready.map(t=>rmTeamRow(t,"data-rmjt",false)).join("")}</div>`
+     :`<div class="dt-none"><p>You need a complete <b>${edn}</b> Dream Team to join${mine.length?". Yours isn't full yet":""}.</p></div>${gbtn(mine.length?"FINISH MY TEAM":"BUILD ONE","gold","rmbuild")}`}
+   <button class="btn ghost" data-close>Not now</button>`);
+  m.querySelectorAll("[data-rmjt]").forEach(b=>b.onclick=()=>{closeModal();rmJoin(o,b.dataset.rmjt);});
+  const bb=$("#rmbuild",m);if(bb)bb.onclick=()=>{closeModal();const t=mine[0];if(t){S.dtEdit={id:t.id,name:t.name,fmt:t.fmt,year:t.year,s:{...t.s},capK:t.capK||null,inj:t.inj||null};go("dtb");}else newTeam(o.fmt+"-"+o.year);};}
+function rmJoin(o,teamId){const me=myBy();if(!me)return;let r;
+  if(o.kind==="draft"){rmLeaveCurrent();rmBarOff();
+    r=rmPut({id:o.id,kind:"draft",role:"member",host:o.host,hostName:o.name,me,sz:o.sz,fmt:o.fmt,year:o.year,seed:0,myT:null,lk:1,paid:1,drafted:0,refunded:0,st:"open",mem:[],inRoom:2,missed:0});}
+  else{const t=dteams().find(x=>x.id===teamId);if(!t||!btReady(t))return;const pk=btPack(t);if(!pk)return;rmLeaveCurrent();rmBarOff();
+    r=rmPut({id:o.id,role:"member",host:o.host,hostName:o.name,me,sz:o.sz,fmt:o.fmt,year:o.year,seed:0,myDt:t.id,myT:pk,lk:0,st:"open",mem:[],inRoom:2,missed:0});}
+  store.set("rmAct",o.id);rmPub(rmMemObj(r));sfx.pick();S.rmView={id:o.id};go("rm");}
+function rmLock(){const r=rmCur();if(!r||r.role!=="member"||r.st!=="open"||rmIsDraft(r))return;const t=dteams().find(x=>x.id===r.myDt);
+  if(!t||!btReady(t)){toast("That Dream Team isn't complete any more");return;}const pk=btPack(t);if(!pk)return;
+  rmPub(rmMemObj(rmPut({id:r.id,myT:pk,lk:1})));sfx.coin();buzz(20);rmRefresh(true);}
+function rmChangeTeam(){const r=rmCur();if(!r||r.lk)return;const ready=dteams().filter(t=>t.fmt===r.fmt&&t.year===r.year&&btReady(t));
+  const m=modal(`<h3>Change your team</h3><div class="ed-list">${ready.map(t=>rmTeamRow(t,"data-rmct",t.id===r.myDt)).join("")}</div><button class="btn ghost" data-close>Cancel</button>`);
+  m.querySelectorAll("[data-rmct]").forEach(b=>b.onclick=()=>{const t=dteams().find(x=>x.id===b.dataset.rmct),pk=t&&btPack(t);if(!pk)return;closeModal();rmPub(rmMemObj(rmPut({id:r.id,myDt:t.id,myT:pk})));rmRefresh(true);});}
+function rmLeaveCurrent(){const r=rmCur();if(!r){rmPub(null);return;}if(S.duel&&S.duel.room&&S.duel.id===r.id)S.duel=null;
+  if(r.st==="open"||r.st==="draft"){if(r.st==="open")rmRefund(r);rmPut({id:r.id,st:r.role==="host"?"closed":"left"});
+    if(r.role==="host"){const x={...rmHostObj(r),st:"x"};rmPub(x);setTimeout(()=>{if(LIVE.extra.rm&&LIVE.extra.rm.id===r.id&&LIVE.extra.rm.st==="x")rmPub(null);},5000);store.set("rmAct",null);return;}}
+  rmPub(null);store.set("rmAct",null);}
+function rmLeave(){const r=rmCur();if(!r||(r.st!=="open"&&r.st!=="draft")){rmPub(null);go("rooms");return;}const host=r.role==="host",mid=r.st==="draft";
+  const m=modal(`<h3>${host?"Close the room?":"Leave the room?"}</h3><p class="center">${mid?host?"The draft is on. Closing the room ends it for everyone.":"The draft is on. If you leave, the room plays without you.":host?"Everyone in it goes back to the lobby.":"You can join again while it's still open."}</p><div class="actions two"><button class="btn ghost" data-close>Stay</button><button class="btn pink" id="rmlv">${host?"Close it":"Leave"}</button></div>`);
+  $("#rmlv",m).onclick=()=>{closeModal();rmLeaveCurrent();go("rooms");};}
+
+/* ---------- the live draft: everyone drafts at once on the duel draft screen ---------- */
+function rmStartDraft(r){r=r&&rmGet(r.id);if(!r||r.st!=="draft")return;ac();setSeed(null);S.daily=null;S.fmt=r.fmt;S.year=r.year;S.picks={};S.free=0;S.T=null;S.cap=null;S.duelLog=[];
+  const t=myTeam()||{name:pickV(NAMES),flag:randomFlag()};S.team={name:t.name,flag:{...t.flag,c:[...t.flag.c]}};
+  S.duel={id:r.id,role:"room",room:1};S.venue=FINAL_ST[r.fmt][r.year];rmPut({id:r.id,drafted:1});rmBarOff();S.rmDsH=null;go("draft");}
+/* when the host starts the draft: jump straight in from a menu screen, otherwise a banner */
+function rmDraftGo(r){if(S.duel&&S.duel.room&&S.duel.id===r.id)return;
+  if(["rm","rooms","home","dream","ranks","cabinet","shop","binder","duel","battle","dtb"].includes(S.screen)){sfx.legend();toast("⚡ The draft is on! Pick your XI");rmStartDraft(r);}
+  else{const t=myTeam();rmBar({flag:t?t.flag:GREY_FLAG,title:`Room ${r.id}: the draft is on`,sub:"Everyone is drafting their XI now",btn:"DRAFT",go:()=>rmStartDraft(rmGet(r.id))});}}
+/* every pick goes out with the room, so the others see your progress */
+const _duelProgress19=duelProgress;
+duelProgress=function(){if(S.duel&&S.duel.room){const r=rmCur();if(r&&r.id===S.duel.id){rmPub(r.role==="host"?rmHostObj(r):rmMemObj(r));rmDraftStrip();}return;}_duelProgress19();};
+function rmLockDraft(){const id=S.duel&&S.duel.id,r=rmCur();
+  if(!r||r.id!==id||r.st!=="draft"){S.duel=null;toast(r&&r.res?"Your room has already been played":"This room has closed");go("rooms");return;}
+  const pk=packTeam({name:S.team.name,flag:S.team.flag},S.picks,r.fmt,r.year);S.duel=null;
+  let nr=rmPut({id:r.id,myT:pk,lk:1});if(nr.role==="host")nr=rmPut({id:nr.id,mem:nr.mem.map(x=>x.by===nr.me?{...x,t:pk,lk:1,c:11}:x)});
+  rmPub(nr.role==="host"?rmHostObj(nr):rmMemObj(nr));sfx.coin();buzz(20);S.rmView={id:nr.id};go("rm");setTimeout(()=>{try{roomTick();}catch(e){console.error(e);}},60);}
+/* the others' progress, live, at the top of the draft screen */
+function rmDraftStrip(){if(!(S.duel&&S.duel.room)||(S.screen!=="draft"&&S.screen!=="name"))return;const r=rmCur();if(!r||r.id!==S.duel.id)return;
+  const others=(r.mem||[]).filter(x=>x.by!==r.me);
+  const h=others.length?`<div class="rm-ds" id="rmds"><b>ROOM ${esc(r.id)}</b>${others.map(x=>{const f=unpackFlag(x.f)||GREY_FLAG,done=x.lk&&x.t;return `<span class="rm-dsc ${done?"ok":""} ${x.off?"off":""}">${flagSVG({isUser:true,flag:f})}<i>${esc(x.n||"Player")}</i><em>${done?"✓":`${x.c||0}/11`}</em></span>`;}).join("")}</div>`:"";
+  const el=$("#rmds");if(el&&S.rmDsH===h)return;S.rmDsH=h;if(el)el.remove();if(!h)return;
+  const dock=$("#gdock");if(dock)dock.insertAdjacentHTML("beforeend",h);else{const hud=document.querySelector("#app .screen > .hud");if(hud)hud.insertAdjacentHTML("afterend",h);}}
+const _vName19=vName;
+vName=function(app){_vName19(app);if(!(S.duel&&S.duel.room))return;const r=rmGet(S.duel.id),b=$("#enter",app);if(b)b.onclick=rmLockDraft;
+  const e=app.querySelector(".t6");if(e&&r&&!app.querySelector(".rm-eyb"))e.insertAdjacentHTML("beforebegin",`<p class="eyb rm-eyb">ROOM ${esc(r.id)} · ${FORMATS[r.fmt].short} WORLD CUP ${r.year}</p>`);};
+
+/* ---------- ROOMS hub ---------- */
+function rmHistRow(r){const left=rmPrizesLeft(r);
+  return `<button class="bt-hr rm-hr" data-rmo="${esc(r.id)}"><span class="bt-hres rm-hres r${Math.min(4,r.rank)}">${ORD(r.rank)}</span><span class="bt-ht"><b>${rmIsDraft(r)?"⚡ Draft":"Room"} ${esc(r.id)} · ${r.n} players</b><small>${FORMATS[r.fmt].short} ${r.year}${left?` · <em class="rm-due">${left} prize${left>1?"s":""} to pick</em>`:` · +${r.xp||0} XP`}</small></span><i aria-hidden="true">›</i></button>`;}
+function vRooms(app){const hist=Object.values(rmRecs()).filter(r=>r.res).sort((a,b)=>(b.goAt||0)-(a.goAt||0)).slice(0,8);
+  app.innerHTML=`<div class="screen duel7 rm19">${topbar()}<div class="tm-top"><button class="gback" id="rmback" aria-label="Back to the lobby">${BACK}</button></div>
+   <div class="dl-hero"><span class="dl-x rm-x">${RM_IC}</span><h2 class="t6">TOURNAMENT <span>ROOMS</span></h2><p class="s6">2 to 6 players, one World Cup. Draft live or bring your Dream Teams. Everyone plays everyone, and the final table decides who takes from whom.</p></div>
+   <div id="rmact"></div>
+   <div class="actions">${gbtn(`${RM_IC}OPEN A ROOM`,"gold","rmnew")}</div>
+   <section class="panel"><div class="ph">OPEN ROOMS<small id="rmcnt"></small></div><div class="pb" id="rmopen"></div></section>
+   <section class="panel"><div class="ph">GOT A ROOM CODE?</div><div class="pb"><form class="rm-codein" id="rmcodef"><input id="rmcode" maxlength="6" placeholder="e.g. KQ7MX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code"><button class="ib-y" type="submit">JOIN</button></form></div></section>
+   ${hist.length?`<section class="bt-hist rm-hist"><div class="bt-hh"><b>YOUR ROOMS</b><small>${hist.length} played</small></div>${hist.map(rmHistRow).join("")}</section>`:""}
+   <section class="panel"><div class="ph">HOW ROOMS WORK</div><div class="pb"><ol class="dl-how">
+    <li><b>Open a room</b> for 2 to 6 players and share the code or the link.</li>
+    <li><b>⚡ Live draft:</b> pick a World Cup. When the room starts, <b>everyone drafts a fresh XI at the same time</b>. No Dream Team needed. Uses 1 energy can.</li>
+    <li><b>🃏 Dream Teams:</b> everyone brings a complete Dream Team from the same World Cup and <b>locks in</b>.</li>
+    <li>Then <b>everyone plays everyone</b> once. Two players play a best of 3.</li>
+    <li>The <b>final table</b> decides the prizes. 1st picks from everyone below, 2nd from everyone below them, and so on. Each pick is one of their <b>top 3 players, face down</b>, and you keep a copy.</li>
+    <li>In Dream Team rooms the owner's card is also <b>injured</b> for ${INJ_GAMES} games or ${INJ_GAMES} days. Live drafts injure nobody.</li></ol></div></section></div>`;
+  $("#rmback").onclick=()=>go("home");$("#rmnew").onclick=()=>rmCreate();
+  $("#rmcodef").onsubmit=e=>{e.preventDefault();const id=cleanId($("#rmcode").value).toUpperCase();if(id.length<4){toast("Room codes are 5 letters and numbers");return;}
+    const o=openRooms().find(x=>x.id===id);if(o){rmJoinView(o);return;}const r=rmGet(id);if(r&&(r.res||r.st==="open"||r.st==="draft")){S.rmView={id};go("rm");return;}
+    S.rmWant=id;S.rmWantAt=Date.now();toast(`Looking for room ${id}…`);};
+  app.querySelectorAll("[data-rmo]").forEach(b=>b.onclick=()=>{S.rmView={id:b.dataset.rmo};go("rm");});
+  S.rmHubH=null;roomsRefresh();refreshHUD();}
+function roomsRefresh(){const box=$("#rmopen");if(!box)return;const o=openRooms(),cur=rmCur();
+  const html=!LIVE.room?`<p class="lb-note">Connecting to the room server…</p>`:o.length?o.map(x=>`<div class="ib-row"><span class="dl-fl">${flagSVG({isUser:true,flag:x.flag})}</span><span class="dl-t"><b>${esc(x.name)}</b><small><span class="rm-kt ${x.kind}">${x.kind==="draft"?"⚡ DRAFT":"🃏 TEAMS"}</span>${FORMATS[x.fmt].short} ${x.year} · ${x.n} of ${x.sz} players</small></span><button class="ib-y" data-rmj="${esc(x.id)}" ${x.full&&!(cur&&cur.id===x.id)?"disabled":""}>${cur&&cur.id===x.id?"OPEN":x.full?"FULL":"JOIN"}</button></div>`).join("")
+    :`<p class="lb-note">No rooms open right now. Open one and share the code with your friends.</p>`;
+  const act=cur&&(cur.st==="open"||cur.st==="draft")?`<button class="bt-inb rm-inb" data-rmopen="${esc(cur.id)}"><span class="rm-inb-i">${RM_IC}</span><span class="bt-inb-t"><small>${cur.st==="draft"?"YOUR ROOM IS DRAFTING":"YOU'RE IN A ROOM"}</small><b>${rmIsDraft(cur)?"Draft room":"Room"} ${esc(cur.id)}</b><em>${FORMATS[cur.fmt].short} ${cur.year} · ${(cur.mem||[]).length||1} of ${cur.sz} players</em></span><span class="dt-pkgo">OPEN</span></button>`:"";
+  const key=html+act;if(S.rmHubH===key)return;S.rmHubH=key;box.innerHTML=html;const c=$("#rmcnt");if(c)c.textContent=o.length?`${o.length} open`:"";const a=$("#rmact");if(a)a.innerHTML=act;
+  box.querySelectorAll("[data-rmj]").forEach(b=>b.onclick=()=>{const x=openRooms().find(q=>q.id===b.dataset.rmj);if(x)rmJoinView(x);else toast("That room just closed");});
+  const ab=document.querySelector("[data-rmopen]");if(ab)ab.onclick=()=>{S.rmView={id:ab.dataset.rmopen};go("rm");};}
+
+/* ---------- a ROOM: the lobby while it fills, the table once it's played ---------- */
+function vRm(app){const r=rmGet(S.rmView&&S.rmView.id);if(!r){setTimeout(()=>go("rooms"));return;}
+  if(r.res){rmResults(app,r);return;}
+  app.innerHTML=`<div class="screen duel7 rm19">${topbar()}<div class="tm-top"><button class="gback" id="rmback" aria-label="Back to rooms">${BACK}</button></div>
+   <p class="eyb">${FORMATS[r.fmt].short} WORLD CUP ${r.year} · ${rmIsDraft(r)?"LIVE DRAFT ROOM":"TOURNAMENT ROOM"}</p>
+   <button class="rm-code" id="rmcopy" aria-label="Share the invite for room ${esc(r.id)}"><small>ROOM CODE</small><b>${esc(r.id)}</b><em>${IC_SHR}Share the invite</em></button>
+   <div id="rmlobby"></div></div>`;
+  $("#rmback").onclick=()=>go("rooms");$("#rmcopy").onclick=()=>rmShare(r);S.rmLobH=null;rmRefresh(true);refreshHUD();}
+function rmRefresh(force){if(S.screen!=="rm")return;const r=rmGet(S.rmView&&S.rmView.id);if(!r)return;
+  if(r.res){if(!$("#rmres"))render();else rmPaintPrizes();return;}
+  const box=$("#rmlobby");if(!box)return;const cc=$("#rmcopy");if(cc)cc.hidden=r.st!=="open";const h=rmLobbyHTML(r);if(!force&&S.rmLobH===h)return;S.rmLobH=h;box.innerHTML=h;rmLobbyBind(box);}
+function rmLobbyHTML(r){if(rmIsDraft(r))return rmDraftLobbyHTML(r);const host=r.role==="host",mem=r.mem||[],sz=r.sz,lk=mem.filter(x=>x.lk&&x.t).length;
+  if(r.st==="closed"||r.st==="left")return `<div class="dt-none"><p><b>${r.missed?"The room started without you.":r.st==="left"?"You left this room.":"This room was closed."}</b></p></div>${gbtn("BACK TO ROOMS","cyan","rmhub")}`;
+  if(r.st==="go")return `<div class="rm-go"><span class="rm-spin" aria-hidden="true"></span><b>STARTING…</b><small>Getting every team's line-up</small></div>`;
+  if(!host&&r.inRoom!==1&&r.inRoom!==0)return `<div class="rm-go"><span class="rm-spin" aria-hidden="true"></span><b>JOINING…</b><small>Waiting for ${esc(r.hostName||"the host")}'s room to let you in</small></div><button class="btn ghost" id="rmleave">Leave</button>`;
+  if(!host&&r.inRoom===0)return `<div class="dt-none"><p><b>This room is full.</b> Ask ${esc(r.hostName||"the host")} to open another one.</p></div><button class="btn ghost" id="rmleave">Leave</button>`;
+  const slots=[];for(let i=0;i<sz;i++){const x=mem[i];
+    if(!x){slots.push(`<div class="rm-slot empty"><span class="rm-dots" aria-hidden="true"><i></i><i></i><i></i></span><small>Waiting for a player</small></div>`);continue;}
+    const t=x.t&&safeTeam(x.t,r.fmt,r.year),me=x.by===r.me,isH=i===0;
+    slots.push(`<div class="rm-slot ${me?"me":""} ${x.lk?"lk":""}"><span class="rm-sfl">${t?flagSVG({isUser:true,flag:t.flag}):`<i class="rm-q">?</i>`}</span><span class="rm-st"><b>${esc(t?t.name:"Picking a team…")}</b><small>${esc(x.n||"Player")}${me?" · YOU":""}</small></span><span class="rm-chip ${isH?"h":x.lk?"ok":""}">${isH?"HOST":x.lk?"✓ LOCKED":"PICKING"}</span><span class="rm-ovr">${t?`OVR ${Math.round(rateXI(t.xi).ovr)}`:""}</span></div>`);}
+  const myT=r.myT&&safeTeam(r.myT,r.fmt,r.year),need=sz-mem.length,unl=mem.length-lk;let ctl="";
+  if(!host&&!r.lk)ctl=`<div class="rm-mine"><span class="rm-mf">${myT?flagSVG({isUser:true,flag:myT.flag}):""}</span><span class="rm-st"><small>YOUR TEAM</small><b>${esc(myT?myT.name:"")}</b></span><button class="r6-link" id="rmchg">Change</button></div>${gbtn("🔒 LOCK IN","gold","rmlock")}<p class="fine center">Once you lock in, your XI is fixed for this room.</p>`;
+  else{const msg=need>0?`Waiting for ${need} more player${need>1?"s":""}`:unl?`Waiting for ${unl} player${unl>1?"s":""} to lock in`:"Everyone's in. Starting";
+    ctl=`<p class="rm-wait"><i class="dot"></i>${host?"":"You're locked in. "}${msg}…</p>`;
+    if(host&&lk>=RM_MIN&&(need>0||unl>0))ctl+=gbtn(`▶ START NOW · ${lk} PLAYERS`,"cyan","rmstart")+`<p class="fine center">Or wait: it starts by itself when all ${sz} are locked in.${unl?" Anyone still picking a team is left out if you start now.":""}</p>`;}
+  return `<p class="rm-cnt"><b>${mem.length}</b> of ${sz} players · <b>${lk}</b> locked in</p><div class="rm-slots">${slots.join("")}</div>${ctl}
+    <div class="rm-rule"><b>🏆 The table decides it</b><span>Each player picks one face-down card from the top 3 of every team below them. They get a copy, and the owner's card is injured for ${INJ_GAMES} games or ${INJ_GAMES} days.</span></div>
+    <button class="btn ghost" id="rmleave">${host?"Close the room":"Leave the room"}</button>`;}
+function rmDraftLobbyHTML(r){const host=r.role==="host",mem=r.mem||[],sz=r.sz,open=r.st==="open",lk=mem.filter(x=>x.lk&&x.t).length;
+  if(r.st==="closed"||r.st==="left")return `<div class="dt-none"><p><b>${r.missed?"The draft started without you.":r.st==="left"?"You left this room.":"This room was closed."}</b>${r.refunded?" Your energy can is back.":""}</p></div>${gbtn("BACK TO ROOMS","cyan","rmhub")}`;
+  if(r.st==="go")return `<div class="rm-go"><span class="rm-spin" aria-hidden="true"></span><b>STARTING…</b><small>Every XI is in. Here come the matches</small></div>`;
+  if(!host&&open&&r.inRoom!==1&&r.inRoom!==0)return `<div class="rm-go"><span class="rm-spin" aria-hidden="true"></span><b>JOINING…</b><small>Waiting for ${esc(r.hostName||"the host")}'s room to let you in</small></div><button class="btn ghost" id="rmleave">Leave</button>`;
+  if(!host&&open&&r.inRoom===0)return `<div class="dt-none"><p><b>This room is full.</b> Ask ${esc(r.hostName||"the host")} to open another one.</p></div><button class="btn ghost" id="rmleave">Leave</button>`;
+  const n=open?sz:mem.length,slots=[];
+  for(let i=0;i<n;i++){const x=mem[i];
+    if(!x){slots.push(`<div class="rm-slot empty"><span class="rm-dots" aria-hidden="true"><i></i><i></i><i></i></span><small>Waiting for a player</small></div>`);continue;}
+    const t=x.t&&safeTeam(x.t,r.fmt,r.year),me=x.by===r.me,fl=unpackFlag(x.f)||(t&&t.flag),done=x.lk&&t;
+    const chip=open?(i===0?"HOST":"READY"):done?"✓ LOCKED":x.off?"AWAY":`DRAFTING`,cls=open?(i===0?"h":"ok"):done?"ok":x.off?"off":"dr";
+    const sub=me?"You":open?"Ready to draft":done?`XI locked in · ${t.name}`:x.off?"Lost connection":`${x.c||0} of 11 picked`;
+    slots.push(`<div class="rm-slot ${me?"me":""} ${done||open?"lk":""}"><span class="rm-sfl">${fl?flagSVG({isUser:true,flag:fl}):`<i class="rm-q">?</i>`}</span><span class="rm-st"><b>${esc(x.n||"Player")}</b><small>${esc(sub)}</small></span><span class="rm-chip ${cls}">${chip}</span><span class="rm-ovr">${done?`OVR ${Math.round(rateXI(t.xi).ovr)}`:!open?`<i class="rm-pbar"><b style="width:${Math.round((x.c||0)/11*100)}%"></b></i>`:""}</span></div>`);}
+  let ctl="";
+  if(open){const need=sz-mem.length;
+    ctl=`<p class="rm-wait"><i class="dot"></i>${need>0?`Waiting for ${need} more player${need>1?"s":""}`:"Everyone's in. Starting the draft"}…</p>`;
+    if(host&&mem.length>=RM_MIN&&need>0)ctl+=gbtn(`⚡ START THE DRAFT · ${mem.length} PLAYERS`,"cyan","rmstart")+`<p class="fine center">Or wait: the draft starts by itself when all ${sz} are in.</p>`;
+    else if(!host)ctl+=`<p class="fine center">The draft starts when the room is full, or when ${esc(r.hostName||"the host")} starts it. Keep the game open.</p>`;}
+  else{const left=mem.filter(x=>!(x.lk&&x.t)&&!x.off).length;
+    if(!(r.lk&&r.myT))ctl=gbtn("⚡ DRAFT MY XI","gold","rmdraft")+`<p class="fine center">Everyone in the room is drafting now.</p>`;
+    else ctl=`<p class="rm-wait"><i class="dot"></i>Your XI is locked in. ${left?`Waiting for ${left} player${left>1?"s":""} to finish drafting`:"Starting the matches"}…</p>`;
+    if(host&&lk>=RM_MIN&&left>0)ctl+=gbtn(`▶ PLAY NOW · ${lk} PLAYERS`,"cyan","rmstart")+`<p class="fine center">Anyone still drafting is left out if you start now.</p>`;}
+  return `<p class="rm-cnt">${open?`<b>${mem.length}</b> of ${sz} players`:`<b>${lk}</b> of ${mem.length} XIs locked in`}</p><div class="rm-slots">${slots.join("")}</div>${ctl}
+    <div class="rm-rule"><b>🏆 The table decides it</b><span>Each player picks one face-down player from the top 3 of every XI below them and keeps a copy. Live drafts injure nobody.</span></div>
+    <button class="btn ghost" id="rmleave">${host?"Close the room":"Leave the room"}</button>`;}
+function rmLobbyBind(box){const q=s=>box.querySelector(s);const dg=q("#rmdraft");if(dg)dg.onclick=()=>rmStartDraft(rmCur()||rmGet(S.rmView&&S.rmView.id));
+  const lv=q("#rmleave");if(lv)lv.onclick=rmLeave;const lk=q("#rmlock");if(lk)lk.onclick=rmLock;const ch=q("#rmchg");if(ch)ch.onclick=rmChangeTeam;
+  const st=q("#rmstart");if(st)st.onclick=()=>rmStart(rmCur());const hb=q("#rmhub");if(hb)hb.onclick=()=>go("rooms");}
+
+/* results: match by match with the table moving, then the podium and the prizes */
+function rmTableHTML(r,run,upto,final){const rows=table({F:run.T.F,groups:{R:run.T.groups.R},results:run.games.slice(0,upto)},"R"),pl=rmPlaces(r,run);
+  return `<div class="tscroll"><table class="tbl rm-tbl"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>L</th><th>NRR</th><th>PTS</th></tr></thead><tbody>${rows.map((x,j)=>{const i=+x.code.slice(1),t=run.T.teams[x.code],m=r.mem[i];
+    return `<tr class="${i===pl.me?"me":""} ${final&&j===0?"rm-1st":""}"><td>${final?MEDAL(j+1):j+1}</td><td><span class="rm-tt"><span class="rm-tfl">${flagSVG(t)}</span><span><b>${esc(t.name)}</b><small>${esc((m&&m.n)||"Player")}</small></span></span></td><td>${x.p}</td><td>${x.w}</td><td>${x.l}</td><td>${(x.nrr>=0?"+":"")+x.nrr.toFixed(2)}</td><td><b>${x.pts}</b></td></tr>`;}).join("")}</tbody></table></div>`;}
+function rmFxHTML(r,run,k,label){const g=run.games[k],n=r.mem.length,me=rmPlaces(r,run).me,T=run.T.teams,sc=i=>`${i.runs}${i.wkts>=10?"":"/"+i.wkts}`;
+  const ia=g.first.team==="R"+g.ra?g.first:g.second,ib=ia===g.first?g.second:g.first,wa=g.winner==="R"+g.ra,side=(i,inn,w,cls)=>{const t=T["R"+i];
+    const fl=`<span class="rm-ffl">${flagSVG(t)}</span>`,nm=`<span class="rm-fn"><b>${esc(t.name)}</b><em>${sc(inn)}<small>${oversStr(inn.balls)} ov</small></em></span>`;
+    return `<div class="rm-ft ${cls} ${w?"w":"x"}">${cls==="l"?fl+nm:nm+fl}</div>`;};
+  return `<div class="rm-fx ${[g.ra,g.rb].includes(me)?"mine":""}" data-i="${k}">${label?`<p class="rm-rd">${label}</p>`:""}<div class="rm-fxr">${side(g.ra,ia,wa,"l")}<span class="rm-vs">v</span>${side(g.rb,ib,!wa,"r")}</div>
+    <p class="rm-fl"><b>${esc(T[g.winner].name)}</b> ${esc(g.summary)}${g.potm&&g.potm.name?` · ⭐ ${esc(g.potm.name)}`:""}</p></div>`;}
+const rmLabel=(r,run,k)=>r.mem.length===2?`MATCH ${k+1} · BEST OF 3`:`ROUND ${run.games[k].rd+1} · MATCH ${k+1} OF ${run.games.length}`;
+function rmResults(app,r){const run=rmRun(r);if(!run){app.innerHTML=`<div class="screen duel7 rm19">${topbar()}<div class="dt-none"><p>This room's teams couldn't be read.</p></div>${gbtn("BACK TO ROOMS","cyan","rmhub")}</div>`;$("#rmhub").onclick=()=>go("rooms");return;}
+  const pl=rmPlaces(r,run),n=r.mem.length,first=!r.seen,win=pl.pos===0;S.rmRun=run;S.rmPzH=null;S.T={teams:run.T.teams,F:run.T.F,fmt:r.fmt,year:r.year};
+  const all=run.games.map((g,k)=>rmFxHTML(r,run,k,n===2?`MATCH ${k+1}`:k===0||run.games[k-1].rd!==g.rd?`ROUND ${g.rd+1}`:"")).join("");
+  app.innerHTML=`<div class="screen duel7 rm19">${topbar()}<div class="tm-top"><button class="gback" id="rmback" aria-label="Back to rooms">${BACK}</button></div>
+   <p class="eyb">${FORMATS[r.fmt].short} WORLD CUP ${r.year} · ROOM ${esc(r.id)}</p><h2 class="t6 rm-t">${n}-PLAYER <span>ROOM</span></h2>
+   <div class="rm-now" id="rmnow" ${first&&!REDUCED?"":"hidden"}></div>
+   <section class="panel rm-tblp"><div class="ph">${first&&!REDUCED?"LIVE TABLE":"FINAL TABLE"}<small>2 pts a win · NRR breaks ties</small></div><div class="pb" id="rmtbl">${rmTableHTML(r,run,first?0:run.games.length,!first)}</div></section>
+   <button class="mt-skip" id="rmskip" ${first&&!REDUCED?"":"hidden"}>Skip to the final table ⏭</button>
+   <div id="rmres" ${first&&!REDUCED?"hidden":""}>
+    <div class="dl-ban ${win?"w":"l"} show rm-ban"><b>${win?"YOU WIN THE ROOM!":`YOU FINISHED ${ORD(pl.pos+1).toUpperCase()}`}</b><small>${ORD(pl.pos+1)} of ${n}${r.xp?` · +${r.xp} XP`:""}${pl.below.length?` · ${pl.below.length} prize pick${pl.below.length>1?"s":""}`:" · no prizes to pick this time"}</small></div>
+    <div id="rmpz"></div>
+    <section class="panel"><div class="ph">ALL MATCHES<small>${run.games.length}</small></div><div class="pb rm-all">${all}</div></section>
+    <div class="actions"><button class="r6-link" id="rmsc">Scorecards</button><button class="r6-link" id="rmhub2">All rooms</button></div><div id="rmscs" hidden></div></div></div>`;
+  app.querySelectorAll(".rm-all .rm-fx").forEach(e=>e.classList.add("done"));
+  const tok=S.rmTok=(S.rmTok||0)+1,alive=()=>S.rmTok===tok&&S.screen==="rm"&&!!$("#rmnow");let fast=false,done=false;
+  const pause=ms=>new Promise(res=>{if(done)return res();setTimeout(res,fast?ms*.3:ms);});
+  function finish(){if(done)return;done=true;S.rmTok++;const now=$("#rmnow");if(now)now.hidden=true;
+    const tb=$("#rmtbl");if(tb)tb.innerHTML=rmTableHTML(r,run,run.games.length,true);const ph=document.querySelector(".rm-tblp .ph");if(ph&&ph.firstChild)ph.firstChild.textContent="FINAL TABLE";
+    $("#rmskip").hidden=true;$("#rmres").hidden=false;const cur=rmGet(r.id);if(cur&&!cur.seen)rmPut({id:r.id,seen:1});rmPaintPrizes(true);
+    if(first&&!REDUCED){win?(sfx.legend(),confetti(160),roar(1,.1)):pl.pos===1?sfx.win():sfx.lose();
+      setTimeout(()=>{const e=$("#rmres");if(e&&S.screen==="rm")e.scrollIntoView({block:"start",behavior:"smooth"});},700);}}
+  $("#rmback").onclick=()=>go("rooms");$("#rmhub2").onclick=()=>go("rooms");$("#rmskip").onclick=finish;$("#rmnow").onclick=()=>{fast=true;};
+  $("#rmsc").onclick=()=>{const s=$("#rmscs");if(!s.innerHTML)s.innerHTML=run.games.map((g,k)=>`<div class="panel"><div class="ph">MATCH ${k+1}<small>${esc(run.T.teams["R"+g.ra].name)} v ${esc(run.T.teams["R"+g.rb].name)}</small></div>${boardCard(g,true)}</div>`).join("");s.hidden=!s.hidden;};
+  if(!first||REDUCED){finish();refreshHUD();return;}
+  (async()=>{await pause(450);
+    for(let k=0;k<run.games.length;k++){if(!alive())return;const now=$("#rmnow");now.innerHTML=rmFxHTML(r,run,k,rmLabel(r,run,k));sfx.tick();await pause(650);if(!alive())return;
+      const el=now.querySelector(".rm-fx");if(el)el.classList.add("done");const g=run.games[k];g.winner==="R"+pl.me?sfx.coin():[g.ra,g.rb].includes(pl.me)?sfx.lose():sfx.rattle();
+      const tb=$("#rmtbl");if(tb)tb.innerHTML=rmTableHTML(r,run,k+1,false);await pause(900);}
+    if(alive())finish();})();
+  refreshHUD();}
+
+/* the prizes: pick from everyone below you, watch everyone above you pick from you */
+function rmPaintPrizes(entering){const box=$("#rmpz"),r=rmGet(S.rmView&&S.rmView.id),run=S.rmRun;if(!box||!r||!r.res||!run||S.rmPicking)return;
+  const pl=rmPlaces(r,run),inj=injuries(),nm=i=>esc(r.mem[i].n||"Player"),tn=i=>esc(run.T.teams["R"+i].name),place=i=>run.order.indexOf(i)+1;
+  const row=(top,cls,reveal,chosen)=>`<div class="pk3-row ${cls}">${top.map(x=>pk3(x,reveal,(reveal?"flip ":"")+(chosen===x.sid?"chosen":reveal?"miss":""))).join("")}</div>`;
+  let h="";const left=pl.below.length-Object.keys(r.picks||{}).length,dr=rmIsDraft(r);
+  if(pl.below.length){h+=`<h3 class="rm-h">YOUR PRIZES<small>${left?`${left} to pick`:"All picked"}</small></h3>`;
+    for(const li of pl.below){const L=r.mem[li],pk=r.picks&&r.picks[L.by],top=rmTop3(r,r.me,li);
+      if(!pk)h+=`<section class="bt-prize win rm-pz ${entering?"in":""}" data-lb="${esc(L.by)}"><div class="bt-ph"><b>FROM ${nm(li).toUpperCase()}</b><small>${ORD(place(li))} place · ${tn(li)}. Their top 3${dr?" drafted players":""}, face down. Pick one and you get ${dr?"the card":"a copy"}.</small></div>${row(top,"pick",false)}</section>`;
+      else{const p=cardByKey(pk.k);h+=`<section class="bt-prize win done rm-pz"><div class="bt-ph"><b>FROM ${nm(li).toUpperCase()}</b><small>${p?`A copy of ${esc(p.name)} is in your collection.`:""} ${dr?"":pk.acked?`Their ${p?esc(surname(p.name)):"card"} is injured for ${INJ_GAMES} games.`:`${nm(li)} finds out next time you're both online.`}</small></div>${row(top,"",true,pk.s)}</section>`;}}}
+  if(pl.above.length){h+=`<h3 class="rm-h lose">ON THE LINE<small>${pl.above.length} player${pl.above.length>1?"s":""} pick from you</small></h3>`;
+    for(const wi of pl.above){const W=r.mem[wi],hit=r.hits&&r.hits[W.by],top=rmTop3(r,W.by,pl.me);
+      if(!hit)h+=`<section class="bt-prize lose rm-pz"><div class="bt-ph"><b>${nm(wi).toUpperCase()} IS PICKING</b><small><i class="dot"></i>${ORD(place(wi))} place. ${dr?"They get a copy of one of your top 3. Nothing leaves your collection.":"They get a copy of one of your top 3, and yours gets injured."}</small></div>${row(top,"wait",false)}</section>`;
+      else{const p=cardByKey(hit.k),i=inj[hit.k],fresh=S.rmHitNew&&S.rmHitNew[r.id+W.by];
+        h+=`<section class="bt-prize lose done rm-pz" data-wb="${esc(W.by)}" data-inj="${i&&!dr?1:0}" data-fresh="${fresh?1:0}"><div class="bt-ph"><b>${nm(wi).toUpperCase()} TOOK A COPY</b><small>${dr?`They picked ${p?esc(p.name):"one of your players"}. Live drafts injure nobody.`:`${p?esc(p.name):"Your player"} ${i?`is injured for ${injLeft(i)}. A sub fills in.`:hit.injOk?"is fit again.":`stays fit: you already had ${INJ_MAX} injured players.`}`}</small></div>${row(top,"",true,hit.s)}${i&&!dr?`<button class="adbtn heal" data-heal="${esc(hit.k)}"><span class="adb-i">📺</span><span class="adb-t"><b>HEAL HIM NOW</b><small>Watch an ad and he's straight back</small></span><span class="adb-go">🩹</span></button>`:""}</section>`;}}}
+  if(!h)h=`<p class="lb-note">No prizes this time.</p>`;
+  if(S.rmPzH===h)return;S.rmPzH=h;box.innerHTML=h;
+  box.querySelectorAll(".rm-pz[data-lb] .pk3-row.pick .pk3").forEach(b=>b.onclick=()=>rmPickFace(b.closest(".rm-pz").dataset.lb,+b.dataset.pos));
+  box.querySelectorAll('.rm-pz[data-inj="1"] .pk3.chosen').forEach(c=>{const s=c.closest(".rm-pz");c.insertAdjacentHTML("beforeend",`<i class="pk3-inj ${s.dataset.fresh==="1"?"in":""}">INJURED</i>`);});
+  if(S.rmHitNew)for(const k in S.rmHitNew)if(k.startsWith(r.id))delete S.rmHitNew[k];}
+async function rmPickFace(lby,pos){const r=rmGet(S.rmView&&S.rmView.id),run=S.rmRun;if(!r||!run||S.rmPicking||(r.picks&&r.picks[lby]))return;
+  const li=r.mem.findIndex(x=>x.by===lby),x=li>=0&&rmTop3(r,r.me,li)[pos];if(!x)return;S.rmPicking=1;
+  const sec=[...document.querySelectorAll(".rm-pz[data-lb]")].find(s=>s.dataset.lb===lby),els=sec?[...sec.querySelectorAll(".pk3-row.pick .pk3")]:[],el=els[pos];els.forEach(b=>b.disabled=true);
+  if(el){el.classList.add("lift");sfx.pick();buzz(15);await sleep(REDUCED?0:380);el.classList.add("flip");sfx.deal();await sleep(REDUCED?0:650);}
+  const res=rmClaim(r.id,lby,x.sid);if(!res){S.rmPicking=0;S.rmPzH=null;rmPaintPrizes();return;}
+  rarity(res.p.r)==="legend"?(sfx.legend(),stampFly("LEGEND!")):sfx.win();
+  els.forEach((b,i)=>{if(i!==pos)setTimeout(()=>{b.classList.add("flip","miss");sfx.tick();},REDUCED?0:250+i*160);});
+  await sleep(REDUCED?0:1300);if(!REDUCED)confetti(90,["#FFC93D","#FFE88A","#FFFFFF","#22C55E"]);S.rmPicking=0;S.rmPzH=null;rmPaintPrizes();
+  toast(`A copy of ${res.p.name} joins your collection${res.n>1?` · ×${res.n}`:""}`);}
+/* healing from the room screen repaints it */
+healNow=function(k){watchAd("heal").then(ok=>{if(!ok)return;const o=injuries();delete o[k];store.set("inj",o);const p=cardByKey(k);sfx.win();toast(`🩹 ${p?p.name:"Your player"} is fit again`);
+  injSweep();if(S.screen==="dream")render();else if(S.screen==="battle")btPaintPrize();else if(S.screen==="rm"){S.rmPzH=null;rmPaintPrizes();}});};
+
+/* ---------- way in: home card, Dream Team button ---------- */
+function homeRooms(){const o=openRooms().filter(x=>!x.full),cur=rmCur(),pend=Object.values(rmRecs()).reduce((s,r)=>s+rmPrizesLeft(r),0),inRm=cur&&(cur.st==="open"||cur.st==="draft");
+  const sub=cur&&cur.st==="draft"?`Room ${cur.id} is drafting`:inRm?`You're in room ${cur.id} · ${(cur.mem||[]).length||1} of ${cur.sz} players`:pend?`${pend} prize${pend>1?"s":""} waiting for you to pick`:o.length?`${o.length} room${o.length>1?"s":""} open right now`:"2 to 6 players · everyone plays everyone",badge=o.length+pend;
+  return `<section class="dl-home rm-home" id="rmhomecard"><div class="dlh-in"><span class="dl-x rm-x">${RM_IC}${badge?`<i class="dlh-badge">${badge}</i>`:""}</span><div class="dlh-t"><b>TOURNAMENT ROOMS</b><small>${esc(sub)}</small></div><button class="dlh-go" id="rmhome">${inRm?"OPEN":o.length?"JOIN":"PLAY"}</button></div></section>`;}
+function homeRoomsBind(){const b=$("#rmhome");if(b)b.onclick=()=>{const c=rmCur();if(c&&(c.st==="open"||c.st==="draft")){S.rmView={id:c.id};go("rm");}else go("rooms");};}
+function homeRoomsRefresh(){const c=$("#rmhomecard");if(!c)return;const h=homeRooms();if(S.rmHomeH===h)return;S.rmHomeH=h;c.outerHTML=h;homeRoomsBind();}
+const _vHome19=vHome;
+vHome=function(app){_vHome19(app);if(S.screen!=="home")return;const d=$("#dlhomecard",app);if(d&&!$("#rmhomecard",app)){const h=homeRooms();S.rmHomeH=h;d.insertAdjacentHTML("afterend",h);homeRoomsBind();}consumeRoomLink();};
+const _dtSlide19=dtSlideHTML;
+dtSlideHTML=function(t){const h=_dtSlide19(t);if(!btReady(t))return h;
+  return h.replace(/<\/article>$/,`<button class="dt-rmgo" data-rmgo="${esc(t.id)}">${RM_IC}<span>OPEN A ROOM</span><small>2 to 6 players</small></button></article>`);};
+document.addEventListener("click",e=>{const g=e.target.closest("[data-rmgo]");if(g){e.preventDefault();rmCreate(g.dataset.rmgo);}});
+const _render19=render;
+render=function(){if(S.screen==="rooms"||S.screen==="rm"){duelBG(true);const app=$("#app");if(S.screen==="rooms")vRooms(app);else vRm(app);document.body.classList.remove("has-nav");const n=$("#navroot");if(n)n.innerHTML="";livePub();return;}_render19();
+  if(S.duel&&S.duel.room&&(S.screen==="draft"||S.screen==="name")){const c=document.querySelector(".fmtchip");if(c)c.innerHTML=c.innerHTML.replace("· DUEL","· ROOM");S.rmDsH=null;rmDraftStrip();}};
 
 let DL=Promise.resolve(null);
 function boot(){setScene();DL=(window.claude&&typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):Promise.resolve(null);render();}

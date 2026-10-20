@@ -3,7 +3,8 @@ services:
   - type: web
     name: dream-team
     runtime: node
-    plan: starter            # always-on; the free plan sleeps, which drops live duels
+    region: singapore        # closest Render region to India; can't be changed later
+    # No plan line on purpose: Render's default paid instance (0.5 CPU, 512 MB). The free plan can't keep a disk.
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
@@ -15,7 +16,7 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: GOOGLE_CLIENT_ID
-        sync: false          # paste your Google OAuth client ID in the Render dashboard
+        sync: false          # Render asks for this once, when you create the Blueprint
       - key: DB_PATH
         value: /var/data/dream-team.db
     disk:

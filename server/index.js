@@ -169,9 +169,10 @@ function validLb(d) {
   return d && typeof d.name === "string" && d.name.length <= 24 && Number.isFinite(d.best) && d.best >= 0 && d.best <= 100000 &&
     Number.isFinite(d.lv) && d.lv >= 1 && d.lv <= 20 && size(d.flag) <= 800 && size(d) <= 1500;
 }
-const DUEL_KEYS = new Set(["host", "guest", "hn", "hf", "fmt", "year", "seed", "ht", "gt", "st", "n", "ts"]);
+const DUEL_KEYS = new Set(["host", "guest", "hn", "hf", "fmt", "year", "seed", "ht", "gt", "gp", "st", "n", "ts"]);
 function validDuel(d) {
-  return d && Object.keys(d).every((k) => DUEL_KEYS.has(k)) && size(d) <= 8000 && (d.st == null || ["invited", "accepted", "drafting", "locked", "declined", "done"].includes(d.st));
+  return d && Object.keys(d).every((k) => DUEL_KEYS.has(k)) && size(d) <= 8000 &&
+    (d.gp == null || (Array.isArray(d.gp) && d.gp.length <= 11 && d.gp.every((x) => typeof x === "string" && x.length <= 16))) && (d.st == null || ["invited", "accepted", "drafting", "locked", "declined", "done"].includes(d.st));
 }
 
 /* live queries: each socket keeps its subscriptions; writes re-run the matching ones */
